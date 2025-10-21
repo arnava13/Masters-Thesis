@@ -1,0 +1,14 @@
+pandas
+numpy
+matplotlib
+geopandas
+shapely
+requests
+bs4
+openpyxl
+earthengine-api
+geemap
+cdsapi
+nb-mermaid 
+git+https://github.com/jabrell/pyeutl.git
+leafmap
