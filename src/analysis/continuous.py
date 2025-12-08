@@ -1,11 +1,12 @@
 """
 continuous.py
 =============
-TWFE Continuous Treatment Specifications.
+TWFE Continuous Treatment Specification.
 
-Two specifications:
-1. TWFE (basic): Facility + Year FE, clustered SEs by region
-2. TWFE (strict): Facility + Region×Year FE, clustered SEs by region
+Single specification: Facility + Region×Year FE, clustered SEs by NUTS2 region.
+
+Rationale: Region×Year FE absorbs regional time-varying confounders (electricity demand,
+fuel prices, policy enforcement) that affect both treatment assignment and outcomes.
 
 Uses pyfixest for fast high-dimensional FE estimation.
     pip install pyfixest
@@ -14,17 +15,13 @@ Uses pyfixest for fast high-dimensional FE estimation.
 import pandas as pd
 import numpy as np
 from typing import Optional, List, Dict
-import warnings
+import pyfixest as pf
 
-from .config import FAC_ID_COL, YEAR_COL, CLUSTER_COL
+# Default column names (can be overridden via function parameters)
+_DEFAULT_FAC_ID_COL = "idx"
+_DEFAULT_YEAR_COL = "year"
+_DEFAULT_CLUSTER_COL = "nuts2_region"
 
-# Import pyfixest (preferred for high-dimensional FE)
-try:
-    import pyfixest as pf
-    HAS_PYFIXEST = True
-except ImportError:
-    HAS_PYFIXEST = False
-    warnings.warn("pyfixest not installed. Install with: pip install pyfixest")
 
 
 # =============================================================================
@@ -36,14 +33,15 @@ def estimate_twfe(
     treatment_col: str,
     outcome_col: str,
     controls: Optional[List[str]] = None,
-    cluster_col: str = CLUSTER_COL,
-    id_col: str = FAC_ID_COL,
-    time_col: str = YEAR_COL,
-    region_time_fe: bool = False,
+    cluster_col: str = _DEFAULT_CLUSTER_COL,
+    id_col: str = _DEFAULT_FAC_ID_COL,
+    time_col: str = _DEFAULT_YEAR_COL,
     region_col: Optional[str] = None
 ) -> Dict:
     """
     Estimate TWFE with continuous treatment.
+    
+    Uses Facility + Region×Year FE with clustered SEs by region.
     
     Parameters
     ----------
@@ -56,13 +54,11 @@ def estimate_twfe(
     controls : list, optional
         Control variables
     cluster_col : str
-        Column for clustered SEs
+        Column for clustered SEs (NUTS2 region)
     id_col : str
         Unit identifier
     time_col : str
         Time period
-    region_time_fe : bool
-        If True, use Region×Year FE instead of Year FE (Spec 2)
     region_col : str, optional
         Region column for Region×Year FE (defaults to cluster_col)
     
@@ -80,15 +76,10 @@ def estimate_twfe(
     controls = controls or []
     control_str = " + ".join(controls) if controls else ""
     
-    if region_time_fe:
-        # Spec 2: Facility + Region×Year FE
-        region_col = region_col or cluster_col
-        fe_str = f"{id_col} + {region_col}^{time_col}"
-        spec_name = "TWFE (Region×Year FE)"
-    else:
-        # Spec 1: Facility + Year FE
-        fe_str = f"{id_col} + {time_col}"
-        spec_name = "TWFE (Year FE)"
+    # Facility + Region×Year FE
+    region_col = region_col or cluster_col
+    fe_str = f"{id_col} + {region_col}^{time_col}"
+    spec_name = "TWFE (Facility + Region×Year FE)"
     
     # Full formula: outcome ~ treatment + controls | FE
     if control_str:
@@ -129,50 +120,31 @@ def estimate_twfe(
     return results
 
 
-def run_both_twfe_specs(
+def run_twfe(
     df: pd.DataFrame,
     treatment_col: str,
     outcome_col: str,
     controls: Optional[List[str]] = None,
-    cluster_col: str = CLUSTER_COL,
+    cluster_col: str = _DEFAULT_CLUSTER_COL,
     region_col: Optional[str] = None,
     **kwargs
-) -> Dict[str, Dict]:
+) -> Dict:
     """
-    Run both TWFE specifications for a given outcome.
+    Run TWFE specification for a given outcome.
     
-    Spec 1: Facility + Year FE
-    Spec 2: Facility + Region×Year FE
-    
-    Both use region-clustered SEs.
+    Uses Facility + Region×Year FE with clustered SEs.
     """
     print("=" * 60)
-    print(f"TWFE: {treatment_col} → {outcome_col}")
+    print(f"TWFE: {treatment_col} -> {outcome_col}")
     print("=" * 60)
     
-    # Spec 1: Year FE
-    spec1 = estimate_twfe(
+    return estimate_twfe(
         df, treatment_col, outcome_col,
         controls=controls,
         cluster_col=cluster_col,
-        region_time_fe=False,
-        **kwargs
-    )
-    
-    # Spec 2: Region×Year FE
-    spec2 = estimate_twfe(
-        df, treatment_col, outcome_col,
-        controls=controls,
-        cluster_col=cluster_col,
-        region_time_fe=True,
         region_col=region_col or cluster_col,
         **kwargs
     )
-    
-    return {
-        "year_fe": spec1,
-        "region_year_fe": spec2
-    }
 
 
 def run_all_outcomes(
@@ -180,11 +152,11 @@ def run_all_outcomes(
     treatment_col: str,
     outcomes: Dict[str, str],
     controls: Optional[List[str]] = None,
-    cluster_col: str = CLUSTER_COL,
+    cluster_col: str = _DEFAULT_CLUSTER_COL,
     **kwargs
 ) -> Dict[str, Dict]:
     """
-    Run both TWFE specs for multiple outcomes.
+    Run TWFE for multiple outcomes.
     
     Parameters
     ----------
@@ -197,7 +169,7 @@ def run_all_outcomes(
     controls : list
         Control variables
     cluster_col : str
-        Clustering column
+        Clustering column (NUTS2 region)
     
     Returns
     -------
@@ -210,7 +182,7 @@ def run_all_outcomes(
         print(f"# Outcome: {name}")
         print(f"{'#' * 60}")
         
-        all_results[name] = run_both_twfe_specs(
+        all_results[name] = run_twfe(
             df, treatment_col, col,
             controls=controls,
             cluster_col=cluster_col,
@@ -230,17 +202,17 @@ def format_results_table(results: Dict) -> pd.DataFrame:
     """
     rows = []
     
-    for outcome, specs in results.items():
-        for spec_name, res in specs.items():
+    for outcome, res in results.items():
+        if isinstance(res, dict) and "coefficient" in res:
             rows.append({
                 "Outcome": outcome,
-                "Specification": res["spec_name"],
+                "Specification": res.get("spec_name", "TWFE"),
                 "Coefficient": res["coefficient"],
                 "SE": res["se"],
                 "P-value": res["pvalue"],
                 "95% CI": f"[{res['ci_lower']:.4f}, {res['ci_upper']:.4f}]",
                 "N": res["n_obs"],
-                "R²": res["r2"]
+                "R2": res.get("r2", np.nan)
             })
     
     return pd.DataFrame(rows)
@@ -267,15 +239,14 @@ def run_outcome_models(
     outcome_col: str,
     treatment_col: str,
     controls: Optional[List[str]] = None,
-    cluster_col: str = CLUSTER_COL,
+    cluster_col: str = _DEFAULT_CLUSTER_COL,
     weight_col: Optional[str] = None,
     label: Optional[str] = None
 ) -> Dict:
     """
     Unified interface for running outcome models.
     
-    Runs both TWFE specs (Year FE, Region×Year FE) for a given outcome.
-    Supports inverse-variance weighting for noisy outcomes.
+    Runs TWFE (Facility + Region×Year FE) for a given outcome.
     
     Parameters
     ----------
@@ -288,28 +259,15 @@ def run_outcome_models(
     controls : list, optional
         Control variables
     cluster_col : str
-        Column for clustered SEs
+        Column for clustered SEs (NUTS2 region)
     weight_col : str, optional
-        Weights column (e.g., 1/SE² for inverse-variance weighting)
+        Weights column (not yet implemented)
     label : str, optional
         Label for output (defaults to outcome_col)
     
     Returns
     -------
-    Dict with model results including:
-        - year_fe: Spec 1 results
-        - region_year_fe: Spec 2 results
-        - metadata: sample size, weights info, etc.
-    
-    Example
-    -------
-    # ETS CO₂ (ground truth, no weighting)
-    ets_results = run_outcome_models(panel, "log_ets_co2", "eu_alloc_ratio")
-    
-    # Satellite NOx (with inverse-variance weighting)
-    panel["nox_weight"] = 1 / (panel["beirle_nox_kg_s_se"] ** 2)
-    nox_results = run_outcome_models(panel, "beirle_nox_kg_s", "eu_alloc_ratio",
-                                      weight_col="nox_weight")
+    Dict with model results and metadata
     """
     label = label or outcome_col
     
@@ -322,13 +280,11 @@ def run_outcome_models(
     # Filter to valid observations
     df_valid = df.dropna(subset=[outcome_col, treatment_col])
     
-    # TODO: pyfixest weight support - for now, document limitation
     if weight_col:
-        print(f"  Note: Inverse-variance weighting requested but not yet implemented in pyfixest.")
-        print(f"  Running unweighted estimation. Consider WLS extension.")
+        print(f"  Note: Inverse-variance weighting not yet implemented.")
     
-    # Run both specs
-    results = run_both_twfe_specs(
+    # Run TWFE
+    results = run_twfe(
         df_valid,
         treatment_col=treatment_col,
         outcome_col=outcome_col,
@@ -342,7 +298,7 @@ def run_outcome_models(
         "outcome_col": outcome_col,
         "treatment_col": treatment_col,
         "n_obs": len(df_valid),
-        "n_facilities": df_valid[FAC_ID_COL].nunique(),
+        "n_facilities": df_valid[_DEFAULT_FAC_ID_COL].nunique(),
         "weighted": weight_col is not None,
         "weight_col": weight_col
     }
@@ -354,50 +310,29 @@ def run_dual_outcome_analysis(
     df: pd.DataFrame,
     treatment_col: str,
     controls: Optional[List[str]] = None,
-    cluster_col: str = CLUSTER_COL,
+    cluster_col: str = _DEFAULT_CLUSTER_COL,
     ets_col: str = "log_ets_co2",
     nox_col: str = "beirle_nox_kg_s",
     nox_se_col: Optional[str] = "beirle_nox_kg_s_se"
 ) -> Dict[str, Dict]:
     """
-    Run models for both ETS CO₂ and Satellite NOx outcomes.
+    Run TWFE for both ETS CO2 and Satellite NOx outcomes.
     
-    Parameters
-    ----------
-    df : DataFrame
-        Full panel with both outcomes
-    treatment_col : str
-        Treatment variable
-    controls : list, optional
-        Control variables
-    cluster_col : str
-        Clustering column
-    ets_col : str
-        ETS CO₂ outcome column
-    nox_col : str
-        Satellite NOx outcome column
-    nox_se_col : str, optional
-        SE column for NOx (for future weighting)
-    
-    Returns
-    -------
-    Dict with results for both outcomes:
-        - ets: ETS CO₂ results
-        - satellite: Satellite NOx results
+    Uses single specification: Facility + Region×Year FE with clustered SEs.
     """
     results = {}
     
-    # ETS CO₂ (ground truth - no weighting needed)
+    # ETS CO2 (ground truth)
     print("\n" + "=" * 70)
-    print("ETS VERIFIED CO₂ EMISSIONS (GROUND TRUTH)")
+    print("ETS VERIFIED CO2 EMISSIONS (GROUND TRUTH)")
     print("=" * 70)
     results["ets"] = run_outcome_models(
         df, outcome_col=ets_col, treatment_col=treatment_col,
         controls=controls, cluster_col=cluster_col,
-        label="ETS CO₂ (tCO₂/yr, log)"
+        label="ETS CO2 (tCO2/yr, log)"
     )
     
-    # Satellite NOx (noisy - could use weighting)
+    # Satellite NOx
     print("\n" + "=" * 70)
     print("SATELLITE NOx EMISSION PROXY (BEIRLE-STYLE)")
     print("=" * 70)
@@ -412,7 +347,7 @@ def run_dual_outcome_analysis(
 
 def format_dual_results_table(results: Dict[str, Dict]) -> pd.DataFrame:
     """
-    Format dual-outcome results as side-by-side comparison table.
+    Format dual-outcome results as comparison table.
     """
     rows = []
     
@@ -423,18 +358,15 @@ def format_dual_results_table(results: Dict[str, Dict]) -> pd.DataFrame:
         meta = outcome_results.get("metadata", {})
         label = meta.get("label", outcome_key)
         
-        for spec_name, spec_results in outcome_results.items():
-            if spec_name == "metadata":
-                continue
-            
+        # Single spec per outcome now
+        if "coefficient" in outcome_results:
             rows.append({
                 "Outcome": label,
-                "Specification": spec_results["spec_name"],
-                "Coefficient": spec_results["coefficient"],
-                "SE": spec_results["se"],
-                "P-value": spec_results["pvalue"],
-                "95% CI": f"[{spec_results['ci_lower']:.4f}, {spec_results['ci_upper']:.4f}]",
-                "N": spec_results["n_obs"]
+                "Coefficient": outcome_results["coefficient"],
+                "SE": outcome_results["se"],
+                "P-value": outcome_results["pvalue"],
+                "95% CI": f"[{outcome_results['ci_lower']:.4f}, {outcome_results['ci_upper']:.4f}]",
+                "N": outcome_results["n_obs"]
             })
     
     return pd.DataFrame(rows)

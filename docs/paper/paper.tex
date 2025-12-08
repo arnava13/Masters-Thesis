@@ -70,7 +70,7 @@ The study makes two primary methodological contributions, both following a recen
 
 \textbf{First}, I demonstrate the use of geospatial foundation model embeddings as high-dimensional controls in panel-based climate monitoring studies. Specifically, I incorporate Google AlphaEarth embeddings \cite{alphaearth2025}---64-dimensional representations learned from multi-source satellite imagery, climate reanalysis, and geotagged text---as control variables in the econometric specifications. These embeddings capture between-unit heterogeneity arising from local geographic, infrastructural, and climate context in a data-efficient manner, providing a scalable approach to controlling for high-dimensional spatial confounders that would be impractical to specify manually. This application extends prior work on learned representations for causal inference---originally developed for text embeddings \cite{veitch2019}---to the domain of geospatial environmental monitoring. The approach is particularly suited to difference-in-differences settings where high-dimensional confounders may violate the parallel trends assumption if left uncontrolled \cite{zimmert2018}.
 
-\textbf{Second}, I introduce network-based clustering derived from an external power system model for both fixed effects structure and inference. Standard errors are clustered using PyPSA-Eur power system clusters \cite{horsch2018}---k-means clusters computed on transmission network topology features extracted from the European high-voltage grid. These clusters group electrical buses based on network connectivity and transmission impedance, producing units where facilities face correlated wholesale prices, dispatch patterns, and grid constraints. This represents a novel application of model-derived features for defining cluster structure in econometric inference, building on recent theoretical foundations establishing that valid cluster-robust inference requires clusters with low ``conductance'' (few cross-cluster connections relative to within-cluster volume) \cite{kojevnikov2023}. Power system network clusters satisfy this requirement by construction, as they minimize within-cluster electrical distance. The same clusters define Region$\times$Year fixed effects, absorbing time-varying regional confounders that correlate with both policy exposure and air quality outcomes.
+\textbf{Second}, I use Eurostat NUTS2 regions for spatial clustering in both fixed effects structure and inference. Standard errors are clustered by NUTS2 region, which groups facilities that share common regional economic conditions, labor markets, and policy enforcement mechanisms. The same regions define Region$\times$Year fixed effects, absorbing time-varying regional confounders that correlate with both policy exposure and air quality outcomes. Unlike sector-specific clustering (e.g., power system network clusters), NUTS2 regions apply uniformly to all industrial facility types and correspond to administrative units where EU and national environmental policies are implemented. For electricity sector heterogeneity analysis, I additionally implement PyPSA-Eur power system clusters \cite{horsch2018}---k-means clusters computed on transmission network topology---which group facilities facing correlated wholesale prices and dispatch patterns.
 
 \textbf{Third}, for the satellite outcome, I implement a simplified Beirle-style flux-divergence method that provides physically grounded NOx emission estimates at the facility level. The approach computes the advection---the scalar product of wind velocity and the spatial gradient of NO$_2$ column density---which under the continuity equation is proportional to local emissions minus chemical loss. For each facility, I integrate advection over a 15 km disc, apply a lifetime correction following \cite{beirle2023}, and convert to NOx emission rates. This methodology follows the Beirle et al. (2019, 2021, 2023) family of methods \cite{beirle2019,beirle2021,beirle2023}, which are physically transparent, computationally tractable for known point sources, and specifically designed for power-plant-scale NOx plumes.
 
@@ -179,7 +179,19 @@ Importantly, Beirle et al. (2023) \cite{beirle2023} use the PAL (Products Algori
 
 \subsubsection{ERA5-Land Reanalysis}
 
-Hourly 10-meter wind components ($u_{10}$, $v_{10}$) are obtained from the ERA5-Land reanalysis product via Google Earth Engine. Daily mean wind speed and direction are computed at each facility location for the advection calculation. Following Beirle et al. \cite{beirle2023}, days with wind speeds below 2 m/s are excluded, as weak winds produce unreliable advection estimates and allow plumes to stagnate near sources. Additionally, observations where the lifetime correction factor $c_\tau \geq 3$ are dropped, as this exceeds the typical range of 1.2--1.8 reported by Beirle et al.
+Hourly 10-meter wind components ($u_{10}$, $v_{10}$) are obtained from the ERA5-Land reanalysis product via Google Earth Engine. Daily mean wind speed and direction are computed at each facility location for the advection calculation. Following Beirle et al. \cite{beirle2023}, days with wind speeds below 2 m/s are excluded, as weak winds produce unreliable advection estimates and allow plumes to stagnate near sources. Additionally, observations where the lifetime correction factor $c_\tau \geq 3$ are dropped, as this exceeds the typical range of 1.2--1.8 reported by Beirle et al. Facility-years with fewer than 20 valid observation days (after wind filtering) are excluded from the satellite panel, as statistical uncertainty becomes prohibitively large with insufficient temporal sampling.
+
+\subsubsection{Urbanization Classification}
+
+Facilities located within urban areas experience higher background NO$_2$ concentrations from traffic and other distributed sources, which adds noise to satellite-derived emission estimates. To enable heterogeneity analysis and descriptive statistics, each facility is assigned an urbanization degree from the JRC Global Human Settlement Layer Degree of Urbanisation raster (GHS-SMOD R2023A) \cite{ghsl_smod}. The SMOD classification ranges from 10 (water) through rural categories (11--13) to suburban (21) and urban categories (22--30), based on population density and built-up area from satellite imagery.
+
+Two urbanization variables are constructed:
+\begin{itemize}
+    \item \texttt{urbanization\_degree}: The continuous SMOD code (10--30) at each facility location
+    \item \texttt{in\_urban\_area}: A boolean flag indicating SMOD $\geq$ 21 (suburban or denser)
+\end{itemize}
+
+\paragraph{Why Urbanization is Not a Regression Control.} These variables are collected for heterogeneity analysis (comparing treatment effects across urban vs.\ rural subsamples) and descriptive statistics, \emph{not} as regression controls. The AlphaEarth embeddings (64 dimensions) already encode land use, built-up area, and urbanization patterns implicitly. Including an explicit urbanization control would introduce multicollinearity with the embedding dimensions without improving identification, since urbanization is time-invariant and absorbed by facility fixed effects regardless. The proper causal use of urbanization is for split-sample analysis, not as an additional covariate.
 
 \subsection{Facility Construction: Spatial Clustering}\label{sec:data:clustering}
 
@@ -245,7 +257,9 @@ S_{it} = V_{it} - A_{it}
 \end{equation}
 Positive shortfall indicates emissions exceed free allocation.
 
-Facilities with allocation ratios outside the range $[0.01, 20]$ are excluded as likely data errors or non-operating installations. Additionally, facilities are required to have at least one year with verified emissions $\geq$100 ktCO$_2$ to ensure sufficient emissions magnitude for detectable satellite signals, following the detection limits established by \cite{beirle2024}.
+Facilities with allocation ratios outside the range $[0.01, 20]$ are excluded as likely data errors or non-operating installations.
+
+\paragraph{Emissions Filter (ETS CO$_2$ Only).} For the ETS CO$_2$ outcome analysis, facilities are required to have at least one year with verified emissions $\geq$100 ktCO$_2$/yr to ensure sufficient policy exposure magnitude. This filter is applied \emph{only} to the ETS CO$_2$ analysis panel, \emph{not} to the satellite NOx panel. The satellite outcome has its own detection limits (0.03--0.11 kg/s NOx) based on the Beirle methodology, which are independent of CO$_2$ emissions. Applying a CO$_2$-based filter to the satellite panel would be methodologically incorrect, as facilities with low CO$_2$ emissions may still have detectable NOx signals (e.g., due to high NOx/CO$_2$ ratios from certain fuel types or combustion technologies).
 
 \subsection{Satellite NOx Emission Proxy: Beirle-Style Flux-Divergence}\label{sec:data:beirle}
 
@@ -530,7 +544,7 @@ Regional electricity demand, fuel prices, and economic conditions create time-va
 
 Region$\times$Year fixed effects absorb these common shocks additively. The identifying variation becomes: \textit{within the same region and year, do facilities with different allocation ratios exhibit different NO$_2$ enhancement?} This comparison holds regional conditions constant while exploiting cross-facility variation in policy exposure.
 
-The PyPSA-Eur k-means clusters \cite{horsch2018} define regions based on transmission network topology rather than administrative boundaries. Facilities in the same electrical cluster face correlated wholesale prices (due to shared market clearing and transmission constraints), similar dispatch patterns, and common grid congestion. This makes them economically meaningful units for absorbing regional time-varying confounders.
+I use NUTS2 regions (Nomenclature of Territorial Units for Statistics, level 2) from Eurostat for clustering. NUTS2 regions ($\sim$200--300 across the EU) define economically coherent regional units that share common labor markets, policy enforcement mechanisms, and infrastructure characteristics. Unlike PyPSA-Eur power system clusters (which are appropriate for electricity sector heterogeneity analysis), NUTS2 regions apply to all industrial facility types---power plants, refineries, cement plants---and correspond to administrative units where regional policies are implemented and enforced. This makes them appropriate for absorbing regional time-varying confounders that affect facilities regardless of their sectoral activity.
 
 \subsubsection{Why We Do Not Control for $U_{it}$ (Plant-Level Time-Varying Unobservables)}
 
@@ -580,38 +594,29 @@ G_i = \min\{t : D_{it} = 1\}
 \end{equation}
 Facilities never treated are assigned $G_i = 0$ (the never-treated control group).
 
-\subsection{Specification 1: TWFE with Continuous Treatment}\label{sec:methods:twfe}
+\subsection{TWFE with Continuous Treatment}\label{sec:methods:twfe}
 
-The baseline two-way fixed effects specification is:
+The main two-way fixed effects specification uses facility and region$\times$year fixed effects:
 \begin{equation}
-Y_{it} = \alpha_i + \gamma_t + \beta R_{it} + \mathbf{X}_{it}'\boldsymbol{\delta} + \varepsilon_{it}
-\label{eq:twfe1}
+Y_{it} = \alpha_i + \gamma_{r(i),t} + \beta R_{it} + \mathbf{X}_{it}'\boldsymbol{\delta} + \varepsilon_{it}
+\label{eq:twfe}
 \end{equation}
 where:
 \begin{itemize}
     \item $\alpha_i$: Facility fixed effects (absorb time-invariant unobservables)
-    \item $\gamma_t$: Year fixed effects (absorb common time shocks)
+    \item $\gamma_{r(i),t}$: Region$\times$Year fixed effects, where $r(i)$ denotes the NUTS2 region containing facility $i$ (absorb regional time-varying confounders)
     \item $\beta$: Treatment effect of interest (effect of unit increase in allocation ratio)
     \item $\mathbf{X}_{it}$: Time-varying controls (capacity, fuel shares) and static AlphaEarth embedding controls ($\mathbf{e}_i \in \mathbb{R}^{64}$)
     \item $\varepsilon_{it}$: Idiosyncratic error
 \end{itemize}
 
-The coefficient $\beta$ is identified from within-facility variation in allocation ratios over time, after controlling for common year effects. For the CO$_2$ outcome, a positive $\beta$ would indicate that higher allocation ratios (less policy stringency) are associated with higher verified emissions---equivalently, that policy stringency reduces CO$_2$. For the NOx outcome, a positive $\beta$ would indicate corresponding reductions in satellite-derived NOx, consistent with co-pollutant dynamics.
+This specification absorbs all region-specific time-varying confounders, including regional electricity prices, demand conditions, fuel prices, and policy enforcement intensity. Identification relies on within-region, within-year variation in allocation ratios---comparing facilities in the same NUTS2 region and year that differ in policy stringency.
 
-Standard errors are clustered at the power system region level using PyPSA-Eur network partitions \\cite{horsch2018}. These clusters are derived from k-means clustering on the European high-voltage transmission network topology, grouping electrical buses based on network connectivity and transmission capacity. The resulting regions capture economic and physical similarities between power plants: facilities in the same electrical region face correlated wholesale electricity prices, are subject to similar dispatch patterns and grid constraints, and share common market clearing mechanisms. This makes them appropriate units for clustered inference in studies of power sector behavior.
+The coefficient $\beta$ is identified from within-facility variation in allocation ratios over time, after controlling for region-year effects. For the CO$_2$ outcome, a positive $\beta$ would indicate that higher allocation ratios (less policy stringency) are associated with higher verified emissions---equivalently, that policy stringency reduces CO$_2$. For the NOx outcome, a positive $\beta$ would indicate corresponding reductions in satellite-derived NOx, consistent with co-pollutant dynamics.
 
-\subsection{Specification 2: TWFE with Region$\times$Year Fixed Effects}\label{sec:methods:twfe2}
+Standard errors are clustered at the NUTS2 region level. NUTS2 regions ($\sim$200--300 across the EU) define economically coherent regional units that share common labor markets, policy enforcement mechanisms, and infrastructure characteristics.
 
-A more demanding specification replaces year fixed effects with region$\times$year interactions:
-\begin{equation}
-Y_{it} = \alpha_i + \gamma_{r(i),t} + \beta R_{it} + \mathbf{X}_{it}'\boldsymbol{\delta} + \varepsilon_{it}
-\label{eq:twfe2}
-\end{equation}
-where $\gamma_{r(i),t}$ are cluster-by-year fixed effects and $r(i)$ denotes the PyPSA-Eur k-means cluster containing facility $i$.
-
-This specification absorbs all region-specific time-varying confounders, including regional electricity prices, demand conditions, and weather patterns. Identification relies on within-region, within-year variation in allocation ratios---comparing facilities in the same region and year that differ in policy stringency.
-
-\subsection{Specification 3: Callaway-Sant'Anna Difference-in-Differences}\label{sec:methods:csdid}
+\subsection{Callaway-Sant'Anna Difference-in-Differences}\label{sec:methods:csdid}
 
 The Callaway and Sant'Anna \cite{callaway2021} estimator addresses potential bias in standard TWFE when treatment timing varies across units and treatment effects are heterogeneous. The method estimates group-time average treatment effects:
 \begin{equation}
@@ -644,25 +649,25 @@ The group-time ATTs are aggregated to produce:
 
 The event-study specification enables pre-trend testing: under parallel trends, $ATT(e) = 0$ for $e < 0$. A Wald test of joint nullity for pre-treatment periods provides formal evidence on the parallel trends assumption.
 
-\subsection{Network-Based Clustering for Inference}\label{sec:methods:clustering}
+\subsection{NUTS2-Based Clustering for Inference}\label{sec:methods:clustering}
 
-Standard errors are clustered at the PyPSA-Eur power system cluster level throughout, representing a novel application of model-derived features for econometric inference. Importantly, these clusters are \textit{not} administrative regions but rather k-means clusters computed on power system features---specifically, the topology and electrical characteristics of the European high-voltage transmission network extracted from ENTSO-E data \cite{horsch2018}. The clustering algorithm groups electrical buses (substations) to minimize within-cluster transmission impedance, producing clusters that reflect the physical and economic structure of the electricity grid rather than political boundaries.
+Standard errors are clustered at the NUTS2 region level throughout. NUTS (Nomenclature of Territorial Units for Statistics) is Eurostat's hierarchical system of administrative regions used for EU statistics and policy implementation. NUTS2 regions ($\sim$200--300 across the EU) correspond to basic regions for the application of regional policies, typically containing 800,000 to 3 million inhabitants.
 
-This clustering strategy is grounded in recent theoretical foundations for network cluster-robust inference. \cite{kojevnikov2023} establish that valid cluster-robust standard errors require clusters with low ``conductance''---the ratio of edges crossing cluster boundaries to total edges within clusters. Intuitively, observations within a cluster should be more correlated with each other than with observations in other clusters. Power system network clusters satisfy this requirement by construction: the k-means objective minimizes within-cluster electrical distance (transmission impedance), which directly corresponds to minimizing cross-cluster connections in the network graph. Facilities in the same electrical cluster face:
+NUTS2 regions are appropriate clustering units because they define economically coherent areas where:
 \begin{itemize}
-    \item \textbf{Correlated wholesale prices}: Shared market clearing and limited cross-cluster transmission capacity mean prices co-move within clusters
-    \item \textbf{Similar dispatch patterns}: Grid constraints and congestion patterns affect which plants are called to generate
-    \item \textbf{Common demand shocks}: Regional electricity demand fluctuations propagate through the local network
+    \item \textbf{Common policy enforcement}: EU and national environmental regulations are implemented and enforced at regional administrative levels
+    \item \textbf{Shared labor markets}: Facilities in the same NUTS2 region draw from similar labor pools and face similar wage pressures
+    \item \textbf{Correlated economic conditions}: Regional GDP, industrial activity, and energy demand co-move within administrative regions
 \end{itemize}
 
-I use 128 clusters, a standard resolution in the PyPSA-Eur literature for EU-wide analyses that balances geographic granularity with sufficient observations per cluster for reliable inference. This represents a novel application of model-derived clustering for econometric inference: rather than using geographic proximity, administrative boundaries, or data-driven clustering on outcome variables, I use clusters computed from features of an external domain-specific model (the power system network) that captures the economically-relevant correlation structure.
+Unlike sector-specific clustering (e.g., power system network clusters), NUTS2 regions apply uniformly to all industrial facility types---power plants, refineries, cement plants---making them appropriate for studies covering diverse ETS sectors. For electricity sector heterogeneity analysis, I additionally implement PyPSA-Eur power system clusters \cite{horsch2018} which group facilities facing correlated wholesale prices and dispatch patterns.
 
-Let $r \in \{1, \ldots, R\}$ index clusters. The cluster-robust variance estimator for the TWFE coefficient is:
+Let $r \in \{1, \ldots, R\}$ index NUTS2 regions. The cluster-robust variance estimator for the TWFE coefficient is:
 \begin{equation}
 \widehat{\text{Var}}(\hat{\beta}) = \left(\mathbf{X}'\mathbf{M}\mathbf{X}\right)^{-1} \left(\sum_{r=1}^{R} \mathbf{X}_r'\hat{\mathbf{u}}_r\hat{\mathbf{u}}_r'\mathbf{X}_r\right) \left(\mathbf{X}'\mathbf{M}\mathbf{X}\right)^{-1}
 \label{eq:clustervar}
 \end{equation}
-where $\mathbf{M}$ is the residual maker for fixed effects and $\hat{\mathbf{u}}_r$ are residuals for observations in cluster $r$.
+where $\mathbf{M}$ is the residual maker for fixed effects and $\hat{\mathbf{u}}_r$ are residuals for observations in NUTS2 region $r$.
 
 %% ========================================================================
 %% RESULTS
@@ -674,8 +679,8 @@ where $\mathbf{M}$ is the residual maker for fixed effects and $\hat{\mathbf{u}}
 This section will present:
 \begin{enumerate}
     \item Descriptive statistics on treatment and outcome distributions
-    \item Effects on verified CO$_2$ emissions (EU ETS) --- TWFE Specifications 1 and 2
-    \item Effects on satellite-derived NOx emission proxy --- TWFE Specifications 1 and 2
+    \item Effects on verified CO$_2$ emissions (EU ETS) --- TWFE with Region$\times$Year FE
+    \item Effects on satellite-derived NOx emission proxy --- TWFE with Region$\times$Year FE
     \item Callaway-Sant'Anna event study results with pre-trend tests for both outcomes
     \item Comparison of CO$_2$ and NOx responses: agreement in sign and magnitude
     \item Robustness checks varying sample restrictions and specifications
@@ -691,26 +696,23 @@ Table~\ref{tab:main} reports the main estimation results.
 
 \begin{table}[h]
 \caption{Main Estimation Results: Effect of Allocation Ratio on Dual Outcomes}\label{tab:main}%
-\begin{tabular*}{\textwidth}{@{\extracolsep\fill}lcccc}
+\begin{tabular*}{\textwidth}{@{\extracolsep\fill}lcc}
 \toprule
-& \multicolumn{2}{c}{Verified CO$_2$ (ktCO$_2$/yr)} & \multicolumn{2}{c}{Satellite NOx (kg/s)} \\
-\cmidrule{2-3}\cmidrule{4-5}
-& Spec 1 & Spec 2 & Spec 1 & Spec 2 \\
+& Verified CO$_2$ (ktCO$_2$/yr) & Satellite NOx (kg/s) \\
 \midrule
-Allocation Ratio ($R_{it}$) & [--] & [--] & [--] & [--] \\
-& ([--]) & ([--]) & ([--]) & ([--]) \\
+Allocation Ratio ($R_{it}$) & [--] & [--] \\
+& ([--]) & ([--]) \\
 \midrule
-Facility FE & Yes & Yes & Yes & Yes \\
-Year FE & Yes & No & Yes & No \\
-Region$\times$Year FE & No & Yes & No & Yes \\
-Controls & Yes & Yes & Yes & Yes \\
+Facility FE & Yes & Yes \\
+Region$\times$Year FE & Yes & Yes \\
+Controls & Yes & Yes \\
 \midrule
-Observations & [--] & [--] & [--] & [--] \\
-Facilities & [--] & [--] & [--] & [--] \\
-$R^2$ (within) & [--] & [--] & [--] & [--] \\
+Observations & [--] & [--] \\
+Facilities & [--] & [--] \\
+$R^2$ (within) & [--] & [--] \\
 \botrule
 \end{tabular*}
-\footnotetext{Note: Standard errors clustered by PyPSA-Eur k-means cluster in parentheses. Controls include capacity (MW), fuel shares (coal, gas), and AlphaEarth embeddings (64 dimensions). * $p<0.10$, ** $p<0.05$, *** $p<0.01$.}
+\footnotetext{Note: Standard errors clustered by NUTS2 region in parentheses. Controls include capacity (MW), fuel shares (coal, gas), and AlphaEarth embeddings (64 dimensions). * $p<0.10$, ** $p<0.05$, *** $p<0.01$.}
 \end{table}
 
 \subsection{Event Study}
@@ -783,13 +785,15 @@ This study contributes to a growing literature on incorporating machine learning
 
 \textbf{Network-based clustering from external models.} The use of PyPSA-Eur power system clusters for both fixed effects and inference represents a novel application of model-derived features for econometric analysis. Traditional approaches to clustered standard errors use geographic proximity or administrative boundaries that may not reflect the economically-relevant correlation structure. By using clusters derived from transmission network topology \cite{horsch2018}, which minimize within-cluster electrical distance, I define regions where facilities face correlated prices, dispatch patterns, and demand shocks---precisely the correlations that motivate cluster-robust inference \cite{kojevnikov2023}. This approach could be extended to other networked industries where external models of the network structure are available.
 
-\subsection{Limitations}
+\subsection{Limitations and Future Work}
 
 The study has several limitations. First, \textbf{sample attrition}: the requirement for valid linkage across three independent data sources (LCP registry, EU Registry crosswalk, EUTL compliance data) combined with the satellite detection threshold (100 ktCO$_2$/yr) reduces the initial universe of 3,405 LCP plants to 251 facilities (7.4\% retention). This attrition reduces statistical power and may introduce selection bias if the matched sample differs systematically from the broader LCP population. The 500m spatial clustering threshold, while appropriate for grouping co-located emission sources into coherent facilities, may occasionally merge distinct plants or fail to group plants that share a common plume.
 
 Second, the sample is restricted to large facilities with sufficient emissions for satellite detection (0.11 kg/s NOx conservative threshold), limiting generalizability to smaller sources. Third, the annual temporal resolution may miss short-run dynamics. Fourth, the satellite NOx proxy is subject to the multiple uncertainty components detailed in Section~\ref{sec:data:beirle}, though these primarily introduce classical measurement error that attenuates rather than biases estimates.
 
 Fifth, regarding the ML-derived features: the AlphaEarth embeddings are treated as exogenous controls, but their validity for causal adjustment depends on the assumption that they capture relevant confounders without inducing collider bias. Similarly, the PyPSA-Eur clusters assume that transmission network topology correctly reflects the correlation structure of unobserved shocks affecting power plant operations. These assumptions are difficult to verify directly and represent areas for future methodological development.
+
+Sixth, the EU ETS registry data used in this study does not include installations in the United Kingdom following Brexit. The UK withdrew from the EU ETS on January 1, 2021, and established its own UK Emissions Trading Scheme \cite{ukgov2024ukets}. Consequently, UK large combustion plants---which represented a significant share of EU ETS-regulated capacity prior to 2021---are excluded from the analysis panel. Future work extending this framework to include UK facilities would require obtaining compliance data from the UK ETS registry and harmonizing it with the EU data sources used here.
 
 %% ========================================================================
 %% CONCLUSION
@@ -860,7 +864,7 @@ Fuel types used by fewer than 10\% of facility-years (Other Solid, Peat) are dro
 
 \section{PyPSA-Eur Network Clustering}\label{app:pypsa}
 
-The analysis uses PyPSA-Eur power system clusters \cite{horsch2018}, which are \textit{not} geographic or administrative regions but rather k-means clusters computed directly on power system features extracted from the European high-voltage transmission network (ENTSO-E data). The clustering algorithm groups electrical buses (substations) based on network connectivity, line impedances, and transmission capacity. The objective function minimizes within-cluster electrical distance, producing clusters where facilities face similar grid constraints, transmission losses, and wholesale price dynamics.
+The analysis uses PyPSA-Eur power system clusters \cite{horsch2018}, which are \textit{not} geographic or administrative regions but rather k-means clusters computed directly on power system features extracted from the European high-voltage transmission network (ENTSO-E data), solved using the Gurobi optimizer \cite{gurobi}. The clustering algorithm groups electrical buses (substations) based on network connectivity, line impedances, and transmission capacity. The objective function minimizes within-cluster electrical distance, producing clusters where facilities face similar grid constraints, transmission losses, and wholesale price dynamics.
 
 This clustering approach has a theoretical justification grounded in recent work on network cluster-robust inference. \cite{kojevnikov2023} establish that valid cluster-robust standard errors require clusters with low ``conductance''---formally, the ratio of edges crossing cluster boundaries to total within-cluster edges. The k-means clustering on transmission network features directly minimizes this quantity: by grouping buses to minimize within-cluster electrical distance (impedance), the algorithm produces clusters with few high-capacity transmission lines crossing boundaries. Facilities within the same cluster are therefore more strongly connected to each other (through the grid) than to facilities in other clusters, satisfying the theoretical requirements for cluster-robust inference.
 

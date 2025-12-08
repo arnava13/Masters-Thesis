@@ -1,6 +1,8 @@
-*.DS_Store
+.*
 data/cache/*
-*.parquet
 data/pypsa-eur-sec/*
+data/pypsa-eur/*
 pyrightconfig.json
 tmp/*
+__pycache__
+*.pyc

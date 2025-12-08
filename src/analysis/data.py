@@ -15,23 +15,34 @@ import numpy as np
 from pathlib import Path
 from typing import Optional, Tuple
 
-from .config import (
-    FACILITIES_STATIC_PATH, FACILITIES_YEARLY_PATH, BEIRLE_PANEL_PATH,
-    FAC_ID_COL, YEAR_COL, ALLOC_RATIO_COL,
-    ETS_CO2_COL, LOG_ETS_CO2_COL, NOX_OUTCOME_COL, NOX_SE_COL,
-    DL_0_11_COL, DL_0_03_COL, REL_ERR_STAT_LT_0_3_COL, INTERFERED_20KM_COL,
-    # Legacy aliases
-    DL_CONSERVATIVE_COL, DL_PERMISSIVE_COL
-)
+# Default paths (pass paths explicitly from notebook)
+_DEFAULT_OUT_DIR = Path("out")
+
+# Default column names (can be overridden via function parameters)
+FAC_ID_COL = "idx"
+YEAR_COL = "year"
+ALLOC_RATIO_COL = "eu_alloc_ratio"
+ETS_CO2_COL = "eu_verified_tco2"
+LOG_ETS_CO2_COL = "log_ets_co2"
+MIN_VERIFIED_CO2_TCO2 = 100_000
+NOX_OUTCOME_COL = "beirle_nox_kg_s"
+NOX_SE_COL = "beirle_nox_kg_s_se"
+DL_0_11_COL = "above_dl_0_11"
+DL_0_03_COL = "above_dl_0_03"
+DL_CONSERVATIVE_COL = DL_0_11_COL
+DL_PERMISSIVE_COL = DL_0_03_COL
+REL_ERR_STAT_LT_0_3_COL = "rel_err_stat_lt_0_3"
+INTERFERED_20KM_COL = "interfered_20km"
+URBANIZATION_DEGREE_COL = "urbanization_degree"
+IN_URBAN_AREA_COL = "in_urban_area"
 
 
 # =============================================================================
 # Data Loading
 # =============================================================================
 
-def load_facilities_static(path: Optional[Path] = None) -> pd.DataFrame:
+def load_facilities_static(path: Path) -> pd.DataFrame:
     """Load static facility attributes (idx, lat, lon, country_code, etc.)."""
-    path = path or FACILITIES_STATIC_PATH
     if not path.exists():
         raise FileNotFoundError(
             f"Static file not found: {path}\n"
@@ -42,9 +53,8 @@ def load_facilities_static(path: Optional[Path] = None) -> pd.DataFrame:
     return df
 
 
-def load_facilities_yearly(path: Optional[Path] = None) -> pd.DataFrame:
+def load_facilities_yearly(path: Path) -> pd.DataFrame:
     """Load yearly panel (idx, year, fuel shares, ETS, outcomes)."""
-    path = path or FACILITIES_YEARLY_PATH
     if not path.exists():
         raise FileNotFoundError(
             f"Yearly file not found: {path}\n"
@@ -55,13 +65,12 @@ def load_facilities_yearly(path: Optional[Path] = None) -> pd.DataFrame:
     return df
 
 
-def load_beirle_panel(path: Optional[Path] = None) -> pd.DataFrame:
+def load_beirle_panel(path: Path) -> pd.DataFrame:
     """
     Load Beirle-style satellite NOx emission panel.
     
     Contains: beirle_nox_kg_s, uncertainties, detection limit flags.
     """
-    path = path or BEIRLE_PANEL_PATH
     if not path.exists():
         raise FileNotFoundError(
             f"Beirle panel not found: {path}\n"
@@ -73,8 +82,8 @@ def load_beirle_panel(path: Optional[Path] = None) -> pd.DataFrame:
 
 
 def load_analysis_panel(
-    static_path: Optional[Path] = None,
-    yearly_path: Optional[Path] = None,
+    static_path: Path,
+    yearly_path: Path,
     beirle_path: Optional[Path] = None,
     include_satellite: bool = True
 ) -> pd.DataFrame:
@@ -100,7 +109,9 @@ def load_analysis_panel(
     yearly = load_facilities_yearly(yearly_path)
     
     # Merge static info into yearly panel
-    static_cols = [FAC_ID_COL, "lat", "lon", "country_code"]
+    # Note: urbanization variables are for heterogeneity analysis, not regression controls
+    static_cols = [FAC_ID_COL, "lat", "lon", "country_code", 
+                   URBANIZATION_DEGREE_COL, IN_URBAN_AREA_COL]
     static_cols = [c for c in static_cols if c in static.columns]
     
     panel = yearly.merge(
@@ -115,7 +126,7 @@ def load_analysis_panel(
         panel[LOG_ETS_CO2_COL] = np.log(panel[ETS_CO2_COL] + 1)
     
     # Merge satellite outcomes
-    if include_satellite:
+    if include_satellite and beirle_path is not None:
         try:
             beirle = load_beirle_panel(beirle_path)
             # Keep only key columns from Beirle panel
@@ -202,12 +213,62 @@ def build_treatment_variables(
 # Sample Filters
 # =============================================================================
 
+def apply_ets_emissions_filter(
+    df: pd.DataFrame,
+    min_co2_tco2: float = MIN_VERIFIED_CO2_TCO2,
+    id_col: str = FAC_ID_COL,
+    co2_col: str = ETS_CO2_COL,
+) -> pd.DataFrame:
+    """
+    Apply emissions filter for ETS CO₂ analysis.
+    
+    Keeps facilities with at least one year above the threshold. This filter
+    is specific to the ETS CO₂ outcome and should NOT be applied to the
+    satellite NOx panel (which has its own detection limits).
+    
+    Parameters
+    ----------
+    df : DataFrame
+        Panel data with ETS CO₂ column
+    min_co2_tco2 : float
+        Minimum verified CO₂ threshold in tCO₂/yr (default: 100,000)
+    id_col : str
+        Facility ID column
+    co2_col : str
+        ETS CO₂ column name
+    
+    Returns
+    -------
+    Filtered DataFrame (facilities with ≥1 year above threshold)
+    """
+    if co2_col not in df.columns:
+        print(f"Warning: {co2_col} not in DataFrame, skipping emissions filter")
+        return df
+    
+    n_fac_before = df[id_col].nunique()
+    n_before = len(df)
+    
+    # Find facilities with at least one year above threshold
+    facs_above = df[df[co2_col] >= min_co2_tco2][id_col].unique()
+    df = df[df[id_col].isin(facs_above)]
+    
+    n_fac_after = df[id_col].nunique()
+    n_after = len(df)
+    
+    print(f"ETS emissions filter (≥{min_co2_tco2/1000:.0f} ktCO₂/yr): "
+          f"{n_fac_before} → {n_fac_after} facilities, {n_before} → {n_after} obs")
+    
+    return df
+
+
 def apply_sample_filters(
     df: pd.DataFrame,
     min_years: int = 3,
     year_range: Optional[Tuple[int, int]] = None,
     require_outcome: bool = True,
     outcome_col: Optional[str] = None,
+    apply_ets_filter: bool = False,
+    min_co2_tco2: float = MIN_VERIFIED_CO2_TCO2,
     id_col: str = FAC_ID_COL,
     time_col: str = YEAR_COL
 ) -> pd.DataFrame:
@@ -226,6 +287,11 @@ def apply_sample_filters(
         If True, drop rows with missing outcome
     outcome_col : str, optional
         Outcome column to check for missingness
+    apply_ets_filter : bool
+        If True, apply ETS emissions filter (≥min_co2_tco2 in any year).
+        Only use for ETS CO₂ analysis, NOT for satellite NOx.
+    min_co2_tco2 : float
+        Minimum CO₂ threshold for ETS filter (default: 100,000 tCO₂/yr)
     
     Returns
     -------
@@ -236,6 +302,10 @@ def apply_sample_filters(
     # Year range
     if year_range:
         df = df[(df[time_col] >= year_range[0]) & (df[time_col] <= year_range[1])]
+    
+    # ETS emissions filter (only for ETS CO₂ analysis)
+    if apply_ets_filter:
+        df = apply_ets_emissions_filter(df, min_co2_tco2=min_co2_tco2, id_col=id_col)
     
     # Min years per facility
     years_per_fac = df.groupby(id_col)[time_col].nunique()
@@ -439,6 +509,7 @@ def summarize_satellite_flags(df: pd.DataFrame) -> pd.DataFrame:
         (DL_0_03_COL, "above_dl_0_03 (≥0.03 kg/s)"),
         (REL_ERR_STAT_LT_0_3_COL, "rel_err_stat < 30%"),
         (INTERFERED_20KM_COL, "interfered_20km"),
+        (IN_URBAN_AREA_COL, "in_urban_area (SMOD ≥21)"),
     ]:
         if col in sat_df.columns:
             n_true = sat_df[col].sum()

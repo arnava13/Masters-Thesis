@@ -6,45 +6,45 @@ Database file #1: sn-bibliography.bib
 Warning--I didn't find a database entry for "sun2022"
 sn-nature.bst [2024/07/19 v1.1 bibliography style]
 Warning--can't use both volume and number fields in ellerman2016
-You've used 21 entries,
+You've used 24 entries,
             2732 wiz_defined-function locations,
-            1187 strings with 14306 characters,
-and the built_in function-call counts, 8035 in all, are:
-= -- 586
-> -- 188
+            1204 strings with 15290 characters,
+and the built_in function-call counts, 8884 in all, are:
+= -- 643
+> -- 208
 < -- 1
-+ -- 94
-- -- 47
-* -- 1018
-:= -- 882
-add.period$ -- 68
-call.type$ -- 21
-change.case$ -- 28
++ -- 104
+- -- 52
+* -- 1101
+:= -- 970
+add.period$ -- 81
+call.type$ -- 24
+change.case$ -- 33
 chr.to.int$ -- 0
-cite$ -- 22
-duplicate$ -- 682
-empty$ -- 739
-format.name$ -- 64
-if$ -- 1595
+cite$ -- 25
+duplicate$ -- 758
+empty$ -- 829
+format.name$ -- 70
+if$ -- 1773
 int.to.chr$ -- 0
-int.to.str$ -- 21
-missing$ -- 173
-newline$ -- 120
-num.names$ -- 21
-pop$ -- 125
+int.to.str$ -- 24
+missing$ -- 192
+newline$ -- 139
+num.names$ -- 24
+pop$ -- 155
 preamble$ -- 1
 purify$ -- 0
 quote$ -- 0
-skip$ -- 95
+skip$ -- 108
 stack$ -- 0
-substring$ -- 394
-swap$ -- 728
+substring$ -- 398
+swap$ -- 805
 text.length$ -- 1
 text.prefix$ -- 0
 top$ -- 1
 type$ -- 0
 warning$ -- 1
-while$ -- 48
-width$ -- 23
-write$ -- 248
+while$ -- 51
+width$ -- 26
+write$ -- 286
 (There were 2 warnings)

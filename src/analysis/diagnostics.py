@@ -12,10 +12,16 @@ from typing import Optional, List, Dict, Tuple
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from .config import (
-    FAC_ID_COL, YEAR_COL, TREATMENT_COL, TREATMENT_DISCRETE_COL, OUTCOME_COL,
-    COHORT_COL, FIGURE_SIZE, FIGURE_DPI, COLOR_PALETTE
-)
+# Default values (can be overridden via function parameters)
+FAC_ID_COL = "idx"
+YEAR_COL = "year"
+TREATMENT_COL = "eu_alloc_ratio"
+TREATMENT_DISCRETE_COL = "treated"
+OUTCOME_COL = "log_ets_co2"
+COHORT_COL = "cohort"
+FIGURE_SIZE = (10, 6)
+FIGURE_DPI = 100
+COLOR_PALETTE = "colorblind"
 
 
 # =============================================================================

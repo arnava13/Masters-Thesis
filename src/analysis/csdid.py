@@ -22,10 +22,13 @@ from typing import Optional, Dict, Tuple
 import warnings
 import matplotlib.pyplot as plt
 
-from .config import (
-    FAC_ID_COL, YEAR_COL, CLUSTER_COL,
-    CS_ANTICIPATION, CS_CONTROL_GROUP, CS_EST_METHOD
-)
+# Default values (can be overridden via function parameters)
+FAC_ID_COL = "idx"
+YEAR_COL = "year"
+CLUSTER_COL = "nuts2_region"
+CS_ANTICIPATION = 0
+CS_CONTROL_GROUP = "nevertreated"
+CS_EST_METHOD = "dr"
 
 # Import csdid
 try:

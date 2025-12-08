@@ -1,10 +1,10 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.4.20)  7 DEC 2025 20:29
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.4.20)  8 DEC 2025 02:04
 entering extended mode
  \write18 enabled.
  file:line:error style messages enabled.
  %&-line parsing enabled.
-**"/Users/arnav/Documents/Columbia/S3/Masters Thesis/paper/paper.tex"
-(/Users/arnav/Documents/Columbia/S3/Masters Thesis/paper/paper.tex
+**"/Users/arnav/Documents/Columbia/S3/Masters Thesis/docs/paper/paper.tex"
+(/Users/arnav/Documents/Columbia/S3/Masters Thesis/docs/paper/paper.tex
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
 (./sn-jnl.cls
@@ -663,40 +663,52 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [9]
 
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 262.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `subscript' on input line 262.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 262.
+
+
+
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [10]
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 284.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `subscript' on input line 284.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 284.
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 290--292
-\OT1/cmr/m/n/10 where $\OML/cmm/m/it/10.03749 J$ \OT1/cmr/m/n/10 is the NO$[]$ pho-tol-y-sis fre-quency (param-e-ter-ized as $0\OML/cmm/m/it/10.03749 :\OT1/cmr/m/n/10 0167 \OMS/cmsy/m/n/10.03749 ^^B
- []
-
-
-Underfull \hbox (badness 2088) in paragraph at lines 290--292
-[]\OT1/cmr/m/n/10 (\OMS/cmsy/m/n/10.03749 ^^@\OT1/cmr/m/n/10 0\OML/cmm/m/it/10.03749 :\OT1/cmr/m/n/10 575\OML/cmm/m/it/10.03749 = []\OT1/cmr/m/n/10 ([]))$ s$[]$), $\OML/cmm/m/it/10.03749 k$ \OT1/cmr/m/n/10 is the reac-tion rate con-stant for NO + O$[]$
- []
-
-
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [11]
 
-Package natbib Warning: Citation `sun2022' on page 12 undefined on input line 297.
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 298.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `subscript' on input line 298.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 298.
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 304--306
+\OT1/cmr/m/n/10 where $\OML/cmm/m/it/10.03749 J$ \OT1/cmr/m/n/10 is the NO$[]$ pho-tol-y-sis fre-quency (param-e-ter-ized as $0\OML/cmm/m/it/10.03749 :\OT1/cmr/m/n/10 0167 \OMS/cmsy/m/n/10.03749 ^^B
+ []
+
+
+Underfull \hbox (badness 2088) in paragraph at lines 304--306
+[]\OT1/cmr/m/n/10 (\OMS/cmsy/m/n/10.03749 ^^@\OT1/cmr/m/n/10 0\OML/cmm/m/it/10.03749 :\OT1/cmr/m/n/10 575\OML/cmm/m/it/10.03749 = []\OT1/cmr/m/n/10 ([]))$ s$[]$), $\OML/cmm/m/it/10.03749 k$ \OT1/cmr/m/n/10 is the reac-tion rate con-stant for NO + O$[]$
+ []
+
+
+Package natbib Warning: Citation `sun2022' on page 12 undefined on input line 311.
 
 
 
@@ -709,25 +721,32 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [13]
-Underfull \hbox (badness 10000) in paragraph at lines 361--362
+Underfull \hbox (badness 10000) in paragraph at lines 375--376
 \OT1/cmr/m/n/10 Main satel-lite regres-sions restrict to ``sig-nif-i-cant'' obser-va-tions sat-is-fy-ing
  []
-
-LaTeX Font Info:    Calculating math sizes for size <8.03> on input line 378.
-
-LaTeX Font Warning: Font shape `U/rsfs/m/n' in size <4.015> not available
-(Font)              size <5> substituted on input line 378.
 
 
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [14
+ [14]
+LaTeX Font Info:    Calculating math sizes for size <8.03> on input line 392.
+
+
+LaTeX Font Warning: Font shape `U/rsfs/m/n' in size <4.015> not available
+(Font)              size <5> substituted on input line 392.
+
+
+
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [15
 pdfTeX warning (ext4): destination with the same identifier (name{table.1}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.406 
+l.431 
       ]
 
 LaTeX Warning: `h' float specifier changed to `ht'.
@@ -739,14 +758,6 @@ LaTeX Warning: `h' float specifier changed to `ht'.
 LaTeX Warning: `h' float specifier changed to `ht'.
 
 
-LaTeX Warning: `h' float specifier changed to `ht'.
-
-
-
-
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [15]
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -755,37 +766,32 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 pdfTeX warning (ext4): destination with the same identifier (name{figure.1}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.493 
-      
-pdfTeX warning (ext4): destination with the same identifier (name{figure.2}) has been already used, duplicate ignored
-<argument> ...shipout:D \box_use:N \l_shipout_box 
-                                                  \__shipout_drop_firstpage_...
-l.493 
-      ]
+l.504 \subsection
+                 {Causal Framework}\label{sec:methods:causal}]
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [17
-pdfTeX warning (ext4): destination with the same identifier (name{figure.3}) has been already used, duplicate ignored
+pdfTeX warning (ext4): destination with the same identifier (name{figure.2}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.502 \end{itemize}
-                   ]
+l.514     \item \textbf
+                       {Plant-level time-varying unobservables} ($U_{it}$): ...]
 
 LaTeX Warning: `h' float specifier changed to `ht'.
 
 
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 527.
+(hyperref)                removing `math shift' on input line 541.
 
 
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `\times' on input line 527.
+(hyperref)                removing `\times' on input line 541.
 
 
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 527.
+(hyperref)                removing `math shift' on input line 541.
 
 
 
@@ -793,22 +799,22 @@ Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [18
-pdfTeX warning (ext4): destination with the same identifier (name{table.2}) has been already used, duplicate ignored
+pdfTeX warning (ext4): destination with the same identifier (name{figure.3}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.534 
+l.546 
       ]
 
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 535.
+(hyperref)                removing `math shift' on input line 549.
 
 
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `subscript' on input line 535.
+(hyperref)                removing `subscript' on input line 549.
 
 
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 535.
+(hyperref)                removing `math shift' on input line 549.
 
 
 
@@ -816,53 +822,39 @@ Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [19
-pdfTeX warning (ext4): destination with the same identifier (name{figure.4}) has been already used, duplicate ignored
+pdfTeX warning (ext4): destination with the same identifier (name{table.2}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.541 \end{enumerate}
-                     ]
+l.554     \item \textbf
+                       {A potential mediator}: If policy affects merit order...]
 
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 545.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `\times' on input line 545.
+(hyperref)                removing `math shift' on input line 559.
 
 
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 545.
+(hyperref)                removing `\times' on input line 559.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 559.
 
 
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [20]
+ [20
+pdfTeX warning (ext4): destination with the same identifier (name{figure.4}) has been already used, duplicate ignored
+<argument> ...shipout:D \box_use:N \l_shipout_box 
+                                                  \__shipout_drop_firstpage_...
+l.562 
+      ]
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [21]
-LaTeX Font Info:    Calculating math sizes for size <12.045> on input line 603.
-
-
-LaTeX Font Warning: Font shape `U/rsfs/m/n' in size <8.43146> not available
-(Font)              size <8> substituted on input line 603.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 603.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `\times' on input line 603.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 603.
-
-
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
@@ -877,7 +869,7 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 LaTeX Warning: `h' float specifier changed to `ht'.
 
 
-LaTeX Warning: Reference `fig:eventstudy' on page 24 undefined on input line 718.
+LaTeX Warning: Reference `fig:eventstudy' on page 24 undefined on input line 720.
 
 
 
@@ -893,14 +885,14 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 pdfTeX warning (ext4): destination with the same identifier (name{table.3}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.753 
-      ]
+l.754 \textbf{Cross-validation}
+                               : Agreement in sign and broad magnitude betwe...]
 
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [26]
-Underfull \hbox (badness 1769) in paragraph at lines 782--783
+Underfull \hbox (badness 1769) in paragraph at lines 784--785
 []\OT1/cmr/bx/n/10.03749 Geospatial foun-da-tion model embed-dings as con-trols. \OT1/cmr/m/n/10 The use of
  []
 
@@ -922,7 +914,7 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
  [29]
 
 Package hyperref Warning: Difference (4) between bookmark levels is greater 
-(hyperref)                than one, level fixed on input line 819.
+(hyperref)                than one, level fixed on input line 823.
 
 
 
@@ -940,8 +932,28 @@ Underfull \vbox (badness 10000) has occurred while \output is active []
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [32]
-Underfull \hbox (badness 2932) in paragraph at lines 102--106
+Underfull \hbox (badness 1533) in paragraph at lines 102--107
+[]\OT1/cmr/m/n/10 Schiavina, M., Mel-chiorri, M. & Pesaresi, M.  GHS-SMOD R2023A ---
+ []
+
+
+Underfull \hbox (badness 2932) in paragraph at lines 109--113
 []\OT1/cmr/m/n/10 Wikipedia con-trib-u-tors.  Lat-i-tude --- Wikipedia, the free ency-clo-pe-dia
+ []
+
+
+Underfull \hbox (badness 1460) in paragraph at lines 128--133
+[]\OT1/cmr/m/n/10 UK Gov-ern-ment.  UK Emis-sions Trad-ing Scheme (UK ETS): A pol-icy
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 128--133
+\OT1/cmr/m/n/10 government / publications / uk-[]emissions-[]trading-[]scheme-[]uk-[]ets-[]policy-[]overview /
+ []
+
+
+Underfull \hbox (badness 3635) in paragraph at lines 128--133
+\OT1/cmr/m/n/10 uk-[]emissions-[]trading-[]scheme-[]uk-[]ets-[]a-[]policy-[]overview$[][].  Accessed Decem-ber
  []
 
 )
@@ -967,21 +979,21 @@ LaTeX Font Warning: Size substitutions with differences
 LaTeX Warning: There were undefined references.
 
 Package rerunfilecheck Info: File `paper.out' has not changed.
-(rerunfilecheck)             Checksum: 31C23E48924FB2EF0EB387DD267D2780;13109.
+(rerunfilecheck)             Checksum: 79B51B16752B049DAF5F4615649AC544;13428.
  ) 
 Here is how much of TeX's memory you used:
- 14887 strings out of 473190
- 228320 string characters out of 5715800
- 642453 words of memory out of 5000000
- 37723 multiletter control sequences out of 15000+600000
- 594805 words of font info for 174 fonts, out of 8000000 for 9000
+ 14880 strings out of 473190
+ 228190 string characters out of 5715800
+ 641238 words of memory out of 5000000
+ 37711 multiletter control sequences out of 15000+600000
+ 590633 words of font info for 157 fonts, out of 8000000 for 9000
  1151 hyphenation exceptions out of 8191
- 90i,12n,93p,1313b,666s stack positions out of 10000i,1000n,20000p,200000b,200000s
-</usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbsy10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx6.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx8.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx9.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmib10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cmextra/cmmib7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr5.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy5.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmti8.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/symbols/msam10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/cm-super/sfrm1000.pfb>
-Output written on paper.pdf (33 pages, 505272 bytes).
+ 90i,12n,93p,1318b,656s stack positions out of 10000i,1000n,20000p,200000b,200000s
+</usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbsy10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx6.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx8.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx9.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbxti10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmib10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cmextra/cmmib7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr5.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy5.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmti8.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/symbols/msam10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/cm-super/sfrm1000.pfb>
+Output written on paper.pdf (33 pages, 522258 bytes).
 PDF statistics:
- 761 PDF objects out of 1000 (max. 8388607)
- 653 compressed objects within 7 object streams
- 172 named destinations out of 1000 (max. 500000)
- 481 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 782 PDF objects out of 1000 (max. 8388607)
+ 672 compressed objects within 7 object streams
+ 176 named destinations out of 1000 (max. 500000)
+ 497 words of extra memory for PDF output out of 10000 (max. 10000000)
 

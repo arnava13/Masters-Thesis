@@ -54,11 +54,6 @@
 \newblock \emph{\bibinfo{journal}{Energy Strategy Reviews}} \textbf{\bibinfo{volume}{22}}, \bibinfo{pages}{207--215} (\bibinfo{year}{2018}).
 \newblock \bibinfo{note}{Network topology from ENTSO-E; clustering reduces computational complexity while preserving electrical characteristics}.
 
-\bibitem{kojevnikov2023}
-\bibinfo{author}{Kojevnikov, D.}, \bibinfo{author}{Marmer, V.} \& \bibinfo{author}{Song, K.}
-\newblock \bibinfo{title}{Network cluster-robust inference}.
-\newblock \emph{\bibinfo{journal}{Econometrica}} \textbf{\bibinfo{volume}{91}}, \bibinfo{pages}{641--667} (\bibinfo{year}{2023}).
-
 \bibitem{callaway2021}
 \bibinfo{author}{Callaway, B.} \& \bibinfo{author}{Sant'Anna, P. H.~C.}
 \newblock \bibinfo{title}{Difference-in-differences with multiple time periods}.
@@ -98,6 +93,18 @@
 \newblock \bibinfo{title}{Estimating dynamic treatment effects in event studies with heterogeneous treatment effects}.
 \newblock \emph{\bibinfo{journal}{Journal of Econometrics}} \textbf{\bibinfo{volume}{225}}, \bibinfo{pages}{175--199} (\bibinfo{year}{2021}).
 
+\bibitem{kojevnikov2023}
+\bibinfo{author}{Kojevnikov, D.}, \bibinfo{author}{Marmer, V.} \& \bibinfo{author}{Song, K.}
+\newblock \bibinfo{title}{Network cluster-robust inference}.
+\newblock \emph{\bibinfo{journal}{Econometrica}} \textbf{\bibinfo{volume}{91}}, \bibinfo{pages}{641--667} (\bibinfo{year}{2023}).
+
+\bibitem{ghsl_smod}
+\bibinfo{author}{Schiavina, M.}, \bibinfo{author}{Melchiorri, M.} \& \bibinfo{author}{Pesaresi, M.}
+\newblock \bibinfo{title}{{GHS-SMOD R2023A} --- {GHS} settlement layers, application of the degree of urbanisation methodology (stage {I}) to {GHS-POP R2023A} and {GHS-BUILT-S R2023A}, multitemporal (1975--2030)}.
+\newblock \bibinfo{howpublished}{European Commission, Joint Research Centre (JRC)} (\bibinfo{year}{2023}).
+\newblock \urlprefix\url{https://developers.google.com/earth-engine/datasets/catalog/JRC_GHSL_P2023A_GHS_SMOD_V2-0}.
+\newblock \bibinfo{note}{Global Human Settlement Layer Degree of Urbanisation. SMOD classes: 10=Water, 11-13=Rural, 21=Suburban, 22-23=Urban cluster, 30=Urban centre. Accessed via Google Earth Engine.}
+
 \bibitem{wiki_latitude_meridian}
 \bibinfo{author}{{Wikipedia contributors}}.
 \newblock \bibinfo{title}{Latitude --- {W}ikipedia{,} the free encyclopedia} (\bibinfo{year}{2024}).
@@ -116,5 +123,17 @@
 \newblock \bibinfo{howpublished}{NIST Chemistry WebBook, SRD 69} (\bibinfo{year}{2023}).
 \newblock \urlprefix\url{https://webbook.nist.gov/cgi/cbook.cgi?ID=10102-44-0}.
 \newblock \bibinfo{note}{CAS 10102-44-0, Molar mass 46.0055 g/mol}.
+
+\bibitem{ukgov2024ukets}
+\bibinfo{author}{{UK Government}}.
+\newblock \bibinfo{title}{{UK Emissions Trading Scheme (UK ETS)}: A policy overview}.
+\newblock \bibinfo{howpublished}{UK Government Policy Paper} (\bibinfo{year}{2024}).
+\newblock \urlprefix\url{https://www.gov.uk/government/publications/uk-emissions-trading-scheme-uk-ets-policy-overview/uk-emissions-trading-scheme-uk-ets-a-policy-overview}.
+\newblock \bibinfo{note}{Accessed December 2024}.
+
+\bibitem{gurobi}
+\bibinfo{author}{{Gurobi Optimization, LLC}}.
+\newblock \bibinfo{title}{{Gurobi Optimizer Reference Manual}} (\bibinfo{year}{2024}).
+\newblock \urlprefix\url{https://www.gurobi.com}.
 
 \end{thebibliography}
