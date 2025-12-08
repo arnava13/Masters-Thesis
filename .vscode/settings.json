@@ -1,3 +1,21 @@
 {
-    "python.languageServer": "None"
+    "python.languageServer": "None",
+    "latex-workshop.latex.tools": [
+        {
+            "name": "latexmk",
+            "command": "latexmk",
+            "args": [
+                "-synctex=1",
+                "-interaction=nonstopmode",
+                "-file-line-error",
+                "-shell-escape",
+                "-pdf",
+                "-outdir=%OUTDIR%",
+                "%DOC%"
+            ],
+            "env": {
+                "PATH": "/usr/local/texlive/2025/bin/universal-darwin:/usr/bin:/bin:/usr/sbin:/sbin"
+            }
+        }
+    ]
 }

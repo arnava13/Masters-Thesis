@@ -1,0 +1,120 @@
+\begin{thebibliography}{10}
+\expandafter\ifx\csname url\endcsname\relax
+  \def\url#1{\burl{#1}}\fi
+\expandafter\ifx\csname urlprefix\endcsname\relax\def\urlprefix{URL }\fi
+\providecommand{\bibinfo}[2]{#2}
+\providecommand{\eprint}[2][]{\url{#2}}
+\providecommand{\doi}[1]{\url{https://doi.org/#1}}
+\bibcommenthead
+
+\bibitem{beirle2019}
+\bibinfo{author}{Beirle, S.} \emph{et~al.}
+\newblock \bibinfo{title}{Pinpointing nitrogen oxide emissions from space}.
+\newblock \emph{\bibinfo{journal}{Science Advances}} \textbf{\bibinfo{volume}{5}}, \bibinfo{pages}{eaax9800} (\bibinfo{year}{2019}).
+
+\bibitem{beirle2021}
+\bibinfo{author}{Beirle, S.} \emph{et~al.}
+\newblock \bibinfo{title}{Catalog of {NOx} emissions from point sources as derived from the divergence of the {NO}$_2$ flux for {TROPOMI}}.
+\newblock \emph{\bibinfo{journal}{Earth System Science Data}} \textbf{\bibinfo{volume}{13}}, \bibinfo{pages}{2995--3012} (\bibinfo{year}{2021}).
+
+\bibitem{beirle2023}
+\bibinfo{author}{Beirle, S.}, \bibinfo{author}{Borger, C.}, \bibinfo{author}{Jost, A.} \& \bibinfo{author}{Wagner, T.}
+\newblock \bibinfo{title}{Improved catalog of {NOx} point source emissions (version 2)}.
+\newblock \emph{\bibinfo{journal}{Earth System Science Data}} \textbf{\bibinfo{volume}{15}}, \bibinfo{pages}{3051--3073} (\bibinfo{year}{2023}).
+\newblock \bibinfo{note}{Key methodological reference for flux-divergence approach, lifetime correction, and NOx/NO$_2$ scaling}.
+
+\bibitem{vandyck2018}
+\bibinfo{author}{Vandyck, T.} \emph{et~al.}
+\newblock \bibinfo{title}{Air quality co-benefits for human health and agriculture counterbalance costs to meet {Paris Agreement} pledges}.
+\newblock \emph{\bibinfo{journal}{Nature Communications}} \textbf{\bibinfo{volume}{9}}, \bibinfo{pages}{4939} (\bibinfo{year}{2018}).
+
+\bibitem{chernozhukov2018}
+\bibinfo{author}{Chernozhukov, V.} \emph{et~al.}
+\newblock \bibinfo{title}{Double/debiased machine learning for treatment and structural parameters}.
+\newblock \emph{\bibinfo{journal}{The Econometrics Journal}} \textbf{\bibinfo{volume}{21}}, \bibinfo{pages}{C1--C68} (\bibinfo{year}{2018}).
+
+\bibitem{veitch2019}
+\bibinfo{author}{Veitch, V.}, \bibinfo{author}{Sridhar, D.} \& \bibinfo{author}{Blei, D.~M.}
+\newblock \bibinfo{title}{Adapting text embeddings for causal inference} (\bibinfo{year}{2019}).
+\newblock \bibinfo{note}{ArXiv:1905.12741}, \bibinfo{eprint}{{\href{https://arxiv.org/abs/1905.12741}{{arXiv:1905.12741}}}}.
+
+\bibitem{zimmert2018}
+\bibinfo{author}{Zimmert, M.}
+\newblock \bibinfo{title}{Efficient difference-in-differences estimation with high-dimensional common trend confounding} (\bibinfo{year}{2018}).
+\newblock \bibinfo{note}{ArXiv:1809.01643}, \bibinfo{eprint}{{\href{https://arxiv.org/abs/1809.01643}{{arXiv:1809.01643}}}}.
+
+\bibitem{alphaearth2025}
+\bibinfo{author}{Rolf, E.} \emph{et~al.}
+\newblock \bibinfo{title}{{AlphaEarth} foundations: An embedding field model for accurate and efficient global mapping from sparse label data} (\bibinfo{year}{2025}).
+\newblock \bibinfo{note}{ArXiv:2507.22291}, \bibinfo{eprint}{{\href{https://arxiv.org/abs/2507.22291}{{arXiv:2507.22291}}}}.
+
+\bibitem{horsch2018}
+\bibinfo{author}{H{\"o}rsch, J.}, \bibinfo{author}{Hofmann, F.}, \bibinfo{author}{Schlachtberger, D.} \& \bibinfo{author}{Brown, T.}
+\newblock \bibinfo{title}{{PyPSA-Eur}: An open optimisation model of the {E}uropean transmission system}.
+\newblock \emph{\bibinfo{journal}{Energy Strategy Reviews}} \textbf{\bibinfo{volume}{22}}, \bibinfo{pages}{207--215} (\bibinfo{year}{2018}).
+\newblock \bibinfo{note}{Network topology from ENTSO-E; clustering reduces computational complexity while preserving electrical characteristics}.
+
+\bibitem{kojevnikov2023}
+\bibinfo{author}{Kojevnikov, D.}, \bibinfo{author}{Marmer, V.} \& \bibinfo{author}{Song, K.}
+\newblock \bibinfo{title}{Network cluster-robust inference}.
+\newblock \emph{\bibinfo{journal}{Econometrica}} \textbf{\bibinfo{volume}{91}}, \bibinfo{pages}{641--667} (\bibinfo{year}{2023}).
+
+\bibitem{callaway2021}
+\bibinfo{author}{Callaway, B.} \& \bibinfo{author}{Sant'Anna, P. H.~C.}
+\newblock \bibinfo{title}{Difference-in-differences with multiple time periods}.
+\newblock \emph{\bibinfo{journal}{Journal of Econometrics}} \textbf{\bibinfo{volume}{225}}, \bibinfo{pages}{200--230} (\bibinfo{year}{2021}).
+
+\bibitem{ellerman2016}
+\bibinfo{author}{Ellerman, A.~D.}, \bibinfo{author}{Marcantonini, C.} \& \bibinfo{author}{Zaklan, A.}
+\newblock \emph{\bibinfo{title}{The {E}uropean {U}nion {E}missions {T}rading {S}ystem: Ten Years and Counting}} Vol.~\bibinfo{volume}{10} (\bibinfo{publisher}{Review of Environmental Economics and Policy}, \bibinfo{year}{2016}).
+
+\bibitem{beirle2024}
+\bibinfo{author}{Beirle, S.} \& \bibinfo{author}{Wagner, T.}
+\newblock \bibinfo{title}{A new method for estimating megacity {NOx} emissions and lifetimes from satellite observations}.
+\newblock \emph{\bibinfo{journal}{Atmospheric Measurement Techniques}} \textbf{\bibinfo{volume}{17}}, \bibinfo{pages}{3439--3453} (\bibinfo{year}{2024}).
+
+\bibitem{jiao2020}
+\bibinfo{author}{Jiao, L.}, \bibinfo{author}{Liu, Y.} \& \bibinfo{author}{Zou, B.}
+\newblock \bibinfo{title}{Satellite verification of ultra-low emission reduction effect of coal-fired power plants}.
+\newblock \emph{\bibinfo{journal}{Atmospheric Pollution Research}} \textbf{\bibinfo{volume}{11}}, \bibinfo{pages}{1839--1847} (\bibinfo{year}{2020}).
+
+\bibitem{castellanos2012}
+\bibinfo{author}{Castellanos, P.} \& \bibinfo{author}{Boersma, K.~F.}
+\newblock \bibinfo{title}{Reductions in nitrogen oxides over {E}urope driven by environmental policy and economic recession}.
+\newblock \emph{\bibinfo{journal}{Scientific Reports}} \textbf{\bibinfo{volume}{2}}, \bibinfo{pages}{265} (\bibinfo{year}{2012}).
+
+\bibitem{fioletov2022}
+\bibinfo{author}{Fioletov, V.} \emph{et~al.}
+\newblock \bibinfo{title}{Quantifying urban, industrial, and background changes in {NO}$_2$ during the {COVID}-19 lockdown period based on {TROPOMI} satellite observations}.
+\newblock \emph{\bibinfo{journal}{Atmospheric Chemistry and Physics}} \textbf{\bibinfo{volume}{22}}, \bibinfo{pages}{4201--4236} (\bibinfo{year}{2022}).
+
+\bibitem{goodman-bacon2021}
+\bibinfo{author}{Goodman-Bacon, A.}
+\newblock \bibinfo{title}{Difference-in-differences with variation in treatment timing}.
+\newblock \emph{\bibinfo{journal}{Journal of Econometrics}} \textbf{\bibinfo{volume}{225}}, \bibinfo{pages}{254--277} (\bibinfo{year}{2021}).
+
+\bibitem{sun2021}
+\bibinfo{author}{Sun, L.} \& \bibinfo{author}{Abraham, S.}
+\newblock \bibinfo{title}{Estimating dynamic treatment effects in event studies with heterogeneous treatment effects}.
+\newblock \emph{\bibinfo{journal}{Journal of Econometrics}} \textbf{\bibinfo{volume}{225}}, \bibinfo{pages}{175--199} (\bibinfo{year}{2021}).
+
+\bibitem{wiki_latitude_meridian}
+\bibinfo{author}{{Wikipedia contributors}}.
+\newblock \bibinfo{title}{Latitude --- {W}ikipedia{,} the free encyclopedia} (\bibinfo{year}{2024}).
+\newblock \urlprefix\url{https://en.wikipedia.org/wiki/Latitude#Meridian_distance_on_the_ellipsoid}.
+\newblock \bibinfo{note}{Section: Meridian distance on the ellipsoid. WGS84 series expansion accurate to 0.01 m/degree}.
+
+\bibitem{lange2022}
+\bibinfo{author}{Lange, K.}, \bibinfo{author}{Richter, A.} \& \bibinfo{author}{Burrows, J.~P.}
+\newblock \bibinfo{title}{Variability of nitrogen oxide emission fluxes and lifetimes estimated from {Sentinel-5P} {TROPOMI} observations}.
+\newblock \emph{\bibinfo{journal}{Atmospheric Chemistry and Physics}} \textbf{\bibinfo{volume}{22}}, \bibinfo{pages}{2745--2767} (\bibinfo{year}{2022}).
+\newblock \bibinfo{note}{Latitude-dependent NOx lifetime parameterization used in Beirle v2}.
+
+\bibitem{nist_no2}
+\bibinfo{author}{{NIST}}.
+\newblock \bibinfo{title}{Nitrogen dioxide ({NO}$_2$)}.
+\newblock \bibinfo{howpublished}{NIST Chemistry WebBook, SRD 69} (\bibinfo{year}{2023}).
+\newblock \urlprefix\url{https://webbook.nist.gov/cgi/cbook.cgi?ID=10102-44-0}.
+\newblock \bibinfo{note}{CAS 10102-44-0, Molar mass 46.0055 g/mol}.
+
+\end{thebibliography}

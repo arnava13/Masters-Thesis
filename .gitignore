@@ -1,3 +1,6 @@
-*.zip
-*.csv
-*.gz
+*.DS_Store
+data/cache/*
+*.parquet
+data/pypsa-eur-sec/*
+pyrightconfig.json
+tmp/*

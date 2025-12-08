@@ -1,0 +1,50 @@
+This is BibTeX, Version 0.99d (TeX Live 2025)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: paper.aux
+The style file: sn-nature.bst
+Database file #1: sn-bibliography.bib
+Warning--I didn't find a database entry for "sun2022"
+sn-nature.bst [2024/07/19 v1.1 bibliography style]
+Warning--can't use both volume and number fields in ellerman2016
+You've used 21 entries,
+            2732 wiz_defined-function locations,
+            1187 strings with 14306 characters,
+and the built_in function-call counts, 8035 in all, are:
+= -- 586
+> -- 188
+< -- 1
++ -- 94
+- -- 47
+* -- 1018
+:= -- 882
+add.period$ -- 68
+call.type$ -- 21
+change.case$ -- 28
+chr.to.int$ -- 0
+cite$ -- 22
+duplicate$ -- 682
+empty$ -- 739
+format.name$ -- 64
+if$ -- 1595
+int.to.chr$ -- 0
+int.to.str$ -- 21
+missing$ -- 173
+newline$ -- 120
+num.names$ -- 21
+pop$ -- 125
+preamble$ -- 1
+purify$ -- 0
+quote$ -- 0
+skip$ -- 95
+stack$ -- 0
+substring$ -- 394
+swap$ -- 728
+text.length$ -- 1
+text.prefix$ -- 0
+top$ -- 1
+type$ -- 0
+warning$ -- 1
+while$ -- 48
+width$ -- 23
+write$ -- 248
+(There were 2 warnings)
