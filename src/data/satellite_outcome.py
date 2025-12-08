@@ -290,7 +290,15 @@ def _compute_emission_rate(
     """
     try:
         # =====================================================================
-        # 1. Base advection: A = u × (∂V/∂x) + v × (∂V/∂y)
+        # 1. Base advection: A = w · ∇V (Beirle et al. 2023 ESSD, Eq. 5)
+        #    A = u × (∂V/∂x) + v × (∂V/∂y)
+        #
+        #    Reference: Beirle et al. (2023) ESSD 15, Sect. 3.5-3.6
+        #    "The advection is calculated as the scalar product of the wind
+        #    vector and the gradient of the TVCD"
+        #
+        #    GEE gradient() returns gradients in geographic coordinates.
+        #    ERA5 wind: u = eastward (+), v = northward (+)
         # =====================================================================
         gradient_v = no2_image.gradient()
         dv_dx = gradient_v.select('x').divide(scale)  # ∂V/∂x per meter
@@ -303,7 +311,6 @@ def _compute_emission_rate(
         
         # =====================================================================
         # 2. Topographic correction (Beirle Sect. 3.7, Sun 2022)
-
         #    C_topo = (V / H_sh) · (w · ∇z₀)  where w·∇z₀ is dot product
         #    A* = A + f × C_topo, with f=1.5, H_sh=1km
         #    Combined: f × C_topo = V × (w · ∇z₀) / 667m
@@ -1028,10 +1035,15 @@ def plot_advection_map(
         year: Year to visualize (full year average)
         emission_kg_s: Optional emission rate to display in legend
     
-    Expected pattern:
-        - Red (positive): wind advecting NO₂ away from source (emission signal)
-        - Blue (negative): wind advecting NO₂ toward location (background inflow)
-        - Dipole structure centered on facility if emissions are present
+    Expected pattern for a point source:
+        - Red (positive A): Upwind of source - concentration increases in wind direction
+          (wind is blowing toward higher concentrations at source)
+        - Blue (negative A): Downwind of source - concentration decreases in wind direction
+          (wind carries plume away, concentration drops with distance)
+        - Dipole structure: red upwind, blue downwind, centered on facility
+        
+    Note: The spatial integral of A over the disc gives the net emission rate.
+    Red upwind + blue downwind is the mathematically correct pattern for A = w·∇V.
     """
     _ensure_ee_initialized()
     
@@ -1117,12 +1129,11 @@ def plot_advection_map(
     
     print(f"Using {year}-{selected_month:02d}: {wind_speed:.1f} m/s from {cardinal} ({wind_dir_from:.0f} deg)")
     
-    # Compute gradient
+    # Compute gradient and advection: A = w · ∇V (Beirle Eq. 5)
     gradient = no2_mean.gradient()
     dx = gradient.select('x').divide(TROPOMI_SCALE_M)
     dy = gradient.select('y').divide(TROPOMI_SCALE_M)
     
-    # Advection
     advection = dx.multiply(wind_u).add(dy.multiply(wind_v))
     
     # Integration disc for clipping

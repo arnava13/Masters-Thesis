@@ -431,6 +431,8 @@ def assign_clusters_to_static(
             
             if static_df[pypsa_col].isna().any(): # type: ignore
                 static_df[pypsa_col] = static_df[pypsa_col].fillna("unassigned")
+            # Convert to string for parquet compatibility (avoids mixed int/str types)
+            static_df[pypsa_col] = static_df[pypsa_col].astype(str)
         else:
             print(f"PyPSA file not found: {pypsa_file} (skipping {pypsa_col})")
             static_df[pypsa_col] = None
