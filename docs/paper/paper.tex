@@ -660,7 +660,15 @@ NUTS2 regions are appropriate clustering units because they define economically 
     \item \textbf{Correlated economic conditions}: Regional GDP, industrial activity, and energy demand co-move within administrative regions
 \end{itemize}
 
-Unlike sector-specific clustering (e.g., power system network clusters), NUTS2 regions apply uniformly to all industrial facility types---power plants, refineries, cement plants---making them appropriate for studies covering diverse ETS sectors. For electricity sector heterogeneity analysis, I additionally implement PyPSA-Eur power system clusters \cite{horsch2018} which group facilities facing correlated wholesale prices and dispatch patterns.
+Unlike sector-specific clustering (e.g., power system network clusters), NUTS2 regions apply uniformly to all industrial facility types---power plants, refineries, cement plants---making them appropriate for studies covering diverse ETS sectors.
+
+\subsubsection{PyPSA-Eur Clusters for Electricity Sector Heterogeneity}
+
+For electricity sector heterogeneity analysis, I additionally implement PyPSA-Eur power system clusters \cite{horsch2018}, which are \textit{not} geographic or administrative regions but rather k-means clusters computed directly on power system features extracted from the European high-voltage transmission network (ENTSO-E data), solved using the Gurobi optimizer \cite{gurobi}. The clustering algorithm groups electrical buses (substations) based on network connectivity, line impedances, and transmission capacity. The objective function minimizes within-cluster electrical distance, producing clusters where facilities face similar grid constraints, transmission losses, and wholesale price dynamics.
+
+This clustering approach has a theoretical justification grounded in recent work on network cluster-robust inference. \cite{kojevnikov2023} establish that valid cluster-robust standard errors require clusters with low ``conductance''---formally, the ratio of edges crossing cluster boundaries to total within-cluster edges. The k-means clustering on transmission network features directly minimizes this quantity: by grouping buses to minimize within-cluster electrical distance (impedance), the algorithm produces clusters with few high-capacity transmission lines crossing boundaries. Facilities within the same cluster are therefore more strongly connected to each other (through the grid) than to facilities in other clusters, satisfying the theoretical requirements for cluster-robust inference.
+
+This represents a novel application of model-derived clustering for econometric inference. Rather than using geographic proximity (which ignores network topology), administrative boundaries (which may cut across electrically-connected regions), or data-driven clustering on outcome variables (which risks overfitting), I use clusters computed from features of an external domain-specific model---the power system transmission network---that captures the economically-relevant correlation structure a priori. For this analysis, the 128-region resolution is used, providing sufficient granularity to capture sub-national variation while maintaining adequate within-region sample sizes for clustered inference. Each facility is assigned to the PyPSA-Eur cluster containing the nearest network bus.
 
 Let $r \in \{1, \ldots, R\}$ index NUTS2 regions. The cluster-robust variance estimator for the TWFE coefficient is:
 \begin{equation}
@@ -793,7 +801,13 @@ Second, the sample is restricted to large facilities with sufficient emissions f
 
 Fifth, regarding the ML-derived features: the AlphaEarth embeddings are treated as exogenous controls, but their validity for causal adjustment depends on the assumption that they capture relevant confounders without inducing collider bias. Similarly, the PyPSA-Eur clusters assume that transmission network topology correctly reflects the correlation structure of unobserved shocks affecting power plant operations. These assumptions are difficult to verify directly and represent areas for future methodological development.
 
-Sixth, the EU ETS registry data used in this study does not include installations in the United Kingdom following Brexit. The UK withdrew from the EU ETS on January 1, 2021, and established its own UK Emissions Trading Scheme \cite{ukgov2024ukets}. Consequently, UK large combustion plants---which represented a significant share of EU ETS-regulated capacity prior to 2021---are excluded from the analysis panel. Future work extending this framework to include UK facilities would require obtaining compliance data from the UK ETS registry and harmonizing it with the EU data sources used here.
+Sixth, the EU ETS registry data used in this study does not include installations in the United
+Kingdom following Brexit. The UK withdrew from the EU ETS on January 1, 2021, and established its
+own UK Emissions Trading Scheme \cite{ukgov2024ukets}. Consequently, UK large combustion
+plants---which represented a significant share of EU ETS-regulated capacity prior to 2021---are
+excluded from the analysis panel. Future work extending this framework to include UK facilities
+would require obtaining compliance data from the UK ETS registry and harmonizing it with the EU data
+sources used here. This may be facilitated in the near future by the linkning of the UK and EU's ETS systems.
 
 %% ========================================================================
 %% CONCLUSION
@@ -820,15 +834,13 @@ As satellite instruments improve in resolution and retrieval accuracy, and as me
 
 \bmhead{Acknowledgements}
 
-I thank my thesis advisors for guidance throughout this project. Computational resources were provided by Google Earth Engine.
-
 \section*{Declarations}
 
 \begin{itemize}
-\item \textbf{Funding}: Not applicable
-\item \textbf{Conflict of interest}: The author declares no conflicts of interest
 \item \textbf{Data availability}: EEA Large Combustion Plant data available from the European Environment Agency Industrial Emissions Portal. EU ETS data available from the European Union Transaction Log. TROPOMI data available via Google Earth Engine. ERA5-Land data available from the Copernicus Climate Data Store.
-\item \textbf{Code availability}: Analysis code available upon request
+\item \textbf{Code availability}: Full data processing and analysis code available at https://github.com/arnava13/Masters-Thesis
+\item \textbf{Use of Generative AI}: Generative AI was used for programming, researching and writing
+this paper. Project direction was driven by me, and I manually audited \& corrected all code, sources, citations, equations and theoretical assertions.
 \end{itemize}
 
 \begin{appendices}
@@ -861,16 +873,6 @@ Raw LCP fuel types are mapped to standardized categories:
 \end{itemize}
 
 Fuel types used by fewer than 10\% of facility-years (Other Solid, Peat) are dropped, shares renormalized, and facilities with no remaining fuel coverage are excluded from the sample.
-
-\section{PyPSA-Eur Network Clustering}\label{app:pypsa}
-
-The analysis uses PyPSA-Eur power system clusters \cite{horsch2018}, which are \textit{not} geographic or administrative regions but rather k-means clusters computed directly on power system features extracted from the European high-voltage transmission network (ENTSO-E data), solved using the Gurobi optimizer \cite{gurobi}. The clustering algorithm groups electrical buses (substations) based on network connectivity, line impedances, and transmission capacity. The objective function minimizes within-cluster electrical distance, producing clusters where facilities face similar grid constraints, transmission losses, and wholesale price dynamics.
-
-This clustering approach has a theoretical justification grounded in recent work on network cluster-robust inference. \cite{kojevnikov2023} establish that valid cluster-robust standard errors require clusters with low ``conductance''---formally, the ratio of edges crossing cluster boundaries to total within-cluster edges. The k-means clustering on transmission network features directly minimizes this quantity: by grouping buses to minimize within-cluster electrical distance (impedance), the algorithm produces clusters with few high-capacity transmission lines crossing boundaries. Facilities within the same cluster are therefore more strongly connected to each other (through the grid) than to facilities in other clusters, satisfying the theoretical requirements for cluster-robust inference.
-
-This represents a novel application of model-derived clustering for econometric inference. Rather than using geographic proximity (which ignores network topology), administrative boundaries (which may cut across electrically-connected regions), or data-driven clustering on outcome variables (which risks overfitting), I use clusters computed from features of an external domain-specific model---the power system transmission network---that captures the economically-relevant correlation structure a priori.
-
-For this analysis, the 128-region resolution is used, providing sufficient granularity to capture sub-national variation while maintaining adequate within-region sample sizes for clustered inference. Each facility is assigned to the PyPSA-Eur cluster containing the nearest network bus.
 
 \end{appendices}
 
