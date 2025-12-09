@@ -45,31 +45,9 @@
 
 \affil{\orgdiv{MA in Quantitative Methods in the Social Sciences}, \orgname{Columbia University}}
 
-\abstract{This study develops a novel framework for evaluating climate policy impacts using two
-complementary emission outcomes. I investigate how European Union Emissions Trading System (EU ETS)
-policy stringency affects both installation-level verified CO$_2$ emissions and satellite-derived
-NOx emission proxies around major industrial emitters. The dual-outcome approach enables
-cross-validation: EU ETS verified emissions provide high-quality, installation-level measures of
-greenhouse gas output, while satellite-derived NOx estimates offer physically grounded proxies for
-combustion co-pollutants that can reveal co-benefits and potential under-reporting. The
-methodological framework makes three primary contributions. First, I demonstrate the integration of
-geospatial foundation model embeddings (Google AlphaEarth, 64 dimensions) as controls in panel-based
-climate monitoring studies, capturing between-unit heterogeneity arising from local geographic and
-climate context in a data-efficient manner that would be impractical to specify manually. Second, I
-introduce network-based clustering for inference: standard errors and region-by-time fixed effects
-use PyPSA-Eur power system clusters---k-means clusters computed on transmission network topology features from an external power system model---that group facilities facing correlated wholesale
-prices, dispatch patterns, and grid constraints. Third, for the satellite outcome, I implement a
-simplified Beirle-style flux-divergence method: using TROPOMI NO$_2$ tropospheric column densities
-and ERA5 winds, I compute the advection (wind-aligned spatial derivative) of NO$_2$ fields around
-each facility, integrate within a 15 km radius, and apply lifetime and NO$_2$-to-NOx corrections
-following Beirle et al. (2023). This approach is physically grounded in the continuity equation and
-specifically designed for power-plant-scale NOx plumes. The analysis panel links 521 EU
-ETS-regulated large combustion plants across Europe (2018--2023) with regulatory emissions data,
-employing two-way fixed effects and Callaway-Sant'Anna difference-in-differences estimators. This
-work demonstrates a novel application of recent advancements in both machine-learning aided causal inference
-as well as remote-sensing derived pollutant outcomes into econometric panel analysis.}
+\abstract{I investigate how European Union Emissions Trading System (EU ETS) policy stringency affects both verified CO$_2$ emissions and satellite-derived NOx proxies at 521 large combustion plants across Europe (2018--2023). Using two-way fixed effects with facility and region-by-year fixed effects, I find that a 10\% allocation shortfall is associated with 1.9\% lower verified CO$_2$ emissions ($\beta = -0.186$, $p < 0.001$). Effects are strongest for coal-dominant facilities ($\beta = -0.98$) and electricity generators ($\beta = -0.21$). Satellite-derived NOx---constructed via Beirle-style flux-divergence from TROPOMI observations---shows consistent negative effects at conservative detection limits ($\beta = -0.003$, $p < 0.01$), providing independent corroboration. The framework makes three methodological contributions: (i) geospatial foundation model embeddings (Google AlphaEarth) as high-dimensional controls for satellite retrieval confounders; (ii) NUTS2 regional clustering for inference with PyPSA-Eur power system clusters for electricity-sector heterogeneity analysis; and (iii) a simplified Beirle-style NOx quantification method adapted for panel econometrics. The dual-outcome approach enables cross-validation: directional agreement between administrative CO$_2$ and satellite NOx strengthens confidence that both capture genuine policy effects. This work demonstrates how ML-derived geospatial features and satellite remote sensing derived physical observables can be integrated into causal inference frameworks for econometric analysis of point-source emissions.}
 
-\keywords{Climate Policy, EU ETS, Verified Emissions, Satellite Remote Sensing, TROPOMI, NOx Emissions, Flux Divergence, Difference-in-Differences, Causal Inference, Large Combustion Plants}
+\keywords{Climate Policy, Climate Monitoring, EU ETS, Verified Emissions, Satellite Remote Sensing, TROPOMI, NOx Emissions, Flux Divergence, Difference-in-Differences, Causal Inference, Large Combustion Plants}
 
 \maketitle
 
@@ -80,7 +58,7 @@ as well as remote-sensing derived pollutant outcomes into econometric panel anal
 
 Evaluating climate policy requires measuring actual emission outcomes. The European Union Emissions Trading System (EU ETS) generates rich administrative data on verified CO$_2$ emissions at the installation level, providing the gold standard for measuring greenhouse gas output from regulated facilities. However, relying solely on self-reported emissions raises questions about verification and leaves unmeasured the local air quality co-benefits that accompany carbon reductions. Satellite remote sensing offers an independent, physically-grounded approach to quantifying emissions from space, potentially revealing both verification opportunities and co-pollutant dynamics that administrative data cannot capture.
 
-This study adopts a dual-outcome approach that exploits the complementary strengths of administrative and satellite data. The two outcomes are: (i) \textbf{verified EU ETS CO$_2$ emissions}---high-quality, installation-level measures from the EU ETS registry that provide accurate compliance trajectories and absolute emission levels; and (ii) a \textbf{satellite-derived NOx emission proxy}---a physically grounded indicator constructed from TROPOMI NO$_2$ tropospheric columns and ERA5 winds, following the flux-divergence approach of Beirle et al. \cite{beirle2019,beirle2021,beirle2023}.
+This study adopts a dual-outcome approach that exploits the complementary strengths of administrative and satellite data. The two outcomes are: (i) verified EU ETS CO$_2$ emissions---high-quality, installation-level measures from the EU ETS registry that provide accurate compliance trajectories and absolute emission levels; and (ii) a satellite-derived NOx emission proxy---a physically grounded indicator constructed from TROPOMI NO$_2$ tropospheric columns and ERA5 winds, following the flux-divergence approach of Beirle et al. \cite{beirle2019,beirle2021,beirle2023}.
 
 Why use both outcomes? CO$_2$ is a well-mixed greenhouse gas with global climate impacts; nitrogen oxides (NO$_x$), by contrast, are criteria pollutants whose health effects---respiratory illness, cardiovascular disease, premature mortality---fall disproportionately on populations living near emission sources. As \cite{vandyck2018} emphasize, air quality co-benefits are particularly policy-relevant because they are local and immediate, whereas averted climate damages are global and long-term. The dual-outcome design provides: (i) verified emissions for accurate policy effect estimation, (ii) satellite-derived NOx for testing co-benefit hypotheses, and (iii) cross-validation opportunities where both outcomes should respond to common policy shocks.
 
@@ -109,7 +87,7 @@ By demonstrating that both administrative emissions records and satellite-derive
 
 The EU ETS, established in 2005, operates as a cap-and-trade system covering approximately 40\% of EU greenhouse gas emissions. Large combustion plants with thermal input exceeding 20 MW are required to hold European Union Allowances (EUAs) equal to their verified CO$_2$ emissions. Allowances are distributed through a combination of free allocation (based on historical benchmarks and carbon leakage risk) and auctioning. Installations that emit more than their free allocation must purchase additional allowances, creating marginal abatement incentives \cite{ellerman2016}.
 
-The policy has evolved through four phases, with Phase III (2013--2020) and Phase IV (2021--2030) introducing progressively tighter caps and reduced free allocation, particularly for the power sector. This study focuses on the period 2018--2023, spanning the transition from Phase III to Phase IV and capturing significant variation in policy stringency across facilities.
+The policy has evolved through fmy phases, with Phase III (2013--2020) and Phase IV (2021--2030) introducing progressively tighter caps and reduced free allocation, particularly for the power sector. This study focuses on the period 2018--2023, spanning the transition from Phase III to Phase IV and capturing significant variation in policy stringency across facilities.
 
 \subsection{Satellite-Based Air Quality Monitoring}
 
@@ -139,11 +117,19 @@ Beirle et al. (2021) \cite{beirle2021} presented the first global catalog of NOx
 
 This study adopts the Beirle family of methods because they are: (i) physically transparent, grounded in the continuity equation; (ii) computationally tractable for known point sources; and (iii) specifically designed and validated for power-plant-scale NOx plumes. I implement a simplified version appropriate for panel econometric analysis, acknowledging the additional uncertainty from using OFFL L3 data rather than the PAL product.
 
-\subsection{Causal Inference with Staggered Treatment Timing}
+\subsection{Causal Inference with Staggered Treatment Timing}\label{sec:background:staggered}
 
 Standard two-way fixed effects estimators can produce biased estimates when treatment timing varies across units and treatment effects are heterogeneous \cite{goodman-bacon2021}. Recent methodological advances, including the Callaway and Sant'Anna \cite{callaway2021} and Sun and Abraham \cite{sun2021} estimators, address these concerns by constructing treatment effect estimates using only valid comparisons (treated versus not-yet-treated or never-treated units) and allowing for treatment effect heterogeneity across cohorts and time.
 
-This study implements both traditional TWFE specifications (which remain valid under homogeneous treatment effects) and the Callaway-Sant'Anna estimator (which is robust to heterogeneity), allowing comparison of results under different identifying assumptions.
+I initially planned to complement TWFE with the Callaway-Sant'Anna estimator. However, this approach
+proved infeasible due to the structure of my data. The CS-DiD estimator requires observing units
+\textit{before} first treatment to establish parallel pre-trends. Defining treatment as allocation
+ratio $R_{it} < 1$, of 457 ever-treated facilities, 84.5\% were already treated in 2018 --- the first
+year of my panel. With no pre-treatment observations for most treated units, the estimator cannot
+identify treatment effects. Extending the panel backward to 2013--2017 (EU ETS Phase 3) could enable
+event-study analysis in future work.
+
+I therefore rely on TWFE with \textit{continuous} treatment (the allocation ratio itself, not a binary indicator), which does not require discrete cohort definitions and exploits within-facility variation in policy stringency over time. This approach remains valid under the assumption of homogeneous treatment effects across facilities, which the heterogeneity analysis (Section~\ref{sec:results:heterogeneity}) examines empirically.
 
 \subsection{High-Dimensional Controls and ML-Derived Features in Causal Inference}\label{sec:background:hdcontrols}
 
@@ -151,12 +137,23 @@ A growing literature in causal inference addresses the challenge of controlling 
 
 In the difference-in-differences context specifically, \cite{zimmert2018} developed efficient estimators for settings where the parallel trends assumption holds only conditional on high-dimensional covariates. This is particularly relevant when unobserved confounders that violate parallel trends can be proxied by high-dimensional observables---such as detailed geographic or economic characteristics that would be impractical to specify manually but can be captured through flexible ML methods.
 
-A parallel development concerns the use of \textit{learned representations}---embeddings from neural networks or foundation models---as control variables. \cite{veitch2019} demonstrated that text embeddings can serve as effective controls for confounding in observational studies, provided the embeddings capture the relevant confounding information. The key insight is that pre-trained representations, learned for prediction tasks on large corpora, may encode information about latent confounders that would otherwise be unobserved. This approach has been extended to various domains, including image embeddings and, most recently, geospatial foundation models.
+A parallel development concerns the use of \textit{learned representations}---embeddings from neural
+networks or foundation models---as control variables. \cite{veitch2019} demonstrated that text
+embeddings can serve as effective controls for confounding in observational studies, provided the
+embeddings capture the relevant confounding information. The key insight is that pre-trained
+(usually unsupervised or self-supervised) representations encode information about latent confounders that would
+otherwise be unobserved. This approach has been extended to various domains, including image
+embeddings and, most recently, geospatial foundation models.
 
 For clustered inference, \cite{kojevnikov2023} established theoretical foundations for network cluster-robust standard errors. They show that valid cluster-robust inference requires clusters with low ``conductance''---the ratio of edges crossing cluster boundaries to total edges within clusters. This implies that clusters should be defined based on the correlation structure of the data-generating process, not arbitrary geographic or administrative boundaries. When observations are connected through a network (as power plants are through the transmission grid), clusters derived from network topology can satisfy these requirements.
 
-This study contributes to this literature by demonstrating two novel applications: (i) using geospatial foundation model embeddings (AlphaEarth) as controls for spatial confounding in environmental panel data, and (ii) using k-means clusters derived from power system network features (PyPSA-Eur) for both fixed effects structure and clustered inference. To my knowledge, this represents the first application of model-derived clustering---where clusters are computed on features from an external domain-specific model rather than on the outcome data itself---for econometric inference in policy evaluation.
-
+This study contributes to this literature by demonstrating two novel applications: (i) using
+geospatial foundation model embeddings (AlphaEarth) as controls for spatial confounding in
+environmental panel data, and (ii) using k-means clusters derived from power system network features
+(PyPSA-Eur) for heterogeneity analysis. To my knowledge, this represents the first application of
+model-derived clustering---where clusters are computed on features from an external domain-specific
+model rather than on the outcome data itself---for econometric time series analysis.
+ 
 %% ========================================================================
 %% DATA
 %% ========================================================================
@@ -164,7 +161,7 @@ This study contributes to this literature by demonstrating two novel application
 
 This section describes the data sources, processing pipeline, and construction of the analysis panel. The study combines administrative records on industrial facilities and EU ETS compliance with satellite remote sensing and meteorological reanalysis data.
 
-\subsection{Data Sources}\label{sec:data:sources}
+\subsection{Data sources}\label{sec:data:sources}
 
 \subsubsection{EEA Large Combustion Plant Registry}
 
@@ -195,11 +192,11 @@ The LCP and ETS datasets are linked through the EU Registry on Industrial Sites,
 
 Tropospheric NO$_2$ column densities are obtained from the Sentinel-5P TROPOMI instrument via Google Earth Engine, using the OFFL (offline) L3 product (\texttt{COPERNICUS/S5P\_OFFL\_L3\_NO2}). TROPOMI provides daily global coverage at approximately 3.5$\times$5.5 km$^2$ spatial resolution. Quality-filtered observations are used, retaining only pixels with quality assurance values $\geq$0.75. TROPOMI captures approximately 14 orbits per day globally, with each orbit covering a distinct swath ($\sim$2600 km); for any given facility, only one orbit per day provides valid coverage.
 
-Importantly, Beirle et al. (2023) \cite{beirle2023} use the PAL (Products Algorithm Laboratory) NO$_2$ product, which provides higher tropospheric vertical column densities (TVCDs) than the OFFL product by a factor of approximately 1.1--1.4, due to updated retrieval algorithms and air mass factor corrections. This difference, combined with other methodological refinements, contributed to their version 2 emission estimates being approximately 3 times higher than version 1. Since I use the OFFL L3 product available via Google Earth Engine rather than the PAL product, the satellite-derived NOx estimates carry additional uncertainty (approximately $\pm$25\% relative to PAL-based estimates) that must be acknowledged in interpretation.
+Importantly, Beirle et al. (2023) \cite{beirle2023} use the PAL (Products Algorithm Laboratory) NO$_2$ product, which provides higher tropospheric vertical column densities (TVCDs) than the OFFL product by a factor of approximately 1.1--1.4, due to updated retrieval algorithms and air mass factor corrections. This difference, combined with other methodological refinements, contributed to their version 2 emission estimates being approximately 3 times higher than version 1. Since I use the OFFL L3 product available via Google Earth Engine rather than the PAL product, the satellite-derived NOx estimates carry additional uncertainty (approximately $\pm$25\% relative to PAL-based estimates) that must be acknowledged.
 
 \subsubsection{ERA5-Land Reanalysis}
 
-Hourly 10-meter wind components ($u_{10}$, $v_{10}$) are obtained from the ERA5-Land reanalysis product via Google Earth Engine. Daily mean wind speed and direction are computed at each facility location for the advection calculation. Following Beirle et al. \cite{beirle2023}, days with wind speeds below 2 m/s are excluded, as weak winds produce unreliable advection estimates and allow plumes to stagnate near sources. Additionally, observations where the lifetime correction factor $c_\tau \geq 3$ are dropped, as this exceeds the typical range of 1.2--1.8 reported by Beirle et al. Facility-years with fewer than 20 valid observation days (after wind filtering) are excluded from the satellite panel, as statistical uncertainty becomes prohibitively large with insufficient temporal sampling.
+Hmyly 10-meter wind components ($u_{10}$, $v_{10}$) are obtained from the ERA5-Land reanalysis product via Google Earth Engine. Daily mean wind speed and direction are computed at each facility location for the advection calculation. Following Beirle et al. \cite{beirle2023}, days with wind speeds below 2 m/s are excluded, as weak winds produce unreliable advection estimates and allow plumes to stagnate near sources. Additionally, observations where the lifetime correction factor $c_\tau \geq 3$ are dropped, as this exceeds the typical range of 1.2--1.8 reported by Beirle et al. Facility-years with fewer than 20 valid observation days (after wind filtering) are excluded from the satellite panel, as statistical uncertainty becomes prohibitively large with insufficient temporal sampling.
 
 \subsubsection{Urbanization Classification}
 
@@ -211,7 +208,7 @@ Two urbanization variables are constructed:
     \item \texttt{in\_urban\_area}: A boolean flag indicating SMOD $\geq$ 21 (suburban or denser)
 \end{itemize}
 
-\paragraph{Why Urbanization is Not a Regression Control.} These variables are collected for heterogeneity analysis (comparing treatment effects across urban vs.\ rural subsamples) and descriptive statistics, \emph{not} as regression controls. The AlphaEarth embeddings (64 dimensions) already encode land use, built-up area, and urbanization patterns implicitly. Including an explicit urbanization control would introduce multicollinearity with the embedding dimensions without improving identification, since urbanization is time-invariant and absorbed by facility fixed effects regardless. The proper causal use of urbanization is for split-sample analysis, not as an additional covariate.
+These variables are collected for heterogeneity analysis (comparing treatment effects across urban vs.\ rural subsamples) and descriptive statistics, \emph{not} as regression controls. The AlphaEarth embeddings (64 dimensions) already encode land use, built-up area, and urbanization patterns implicitly. Including an explicit urbanization control would introduce multicollinearity with the embedding dimensions without improving identification, since urbanization is time-invariant and absorbed by facility fixed effects regardless. The proper causal use of urbanization is for split-sample analysis, not as an additional covariate.
 
 \subsection{Facility Construction: Spatial Clustering}\label{sec:data:clustering}
 
@@ -259,7 +256,9 @@ s_{it}^{(f)} = \frac{E_{it}^{(f)}}{\sum_{f'} E_{it}^{(f')}}
 \label{eq:fuelshare}
 \end{equation}
 
-Fuel types used by fewer than 10\% of facility-years (peat, other solid fuels) are dropped, remaining shares are renormalized to sum to unity, and facilities with no remaining fuel coverage are excluded.
+Fuel types used by fewer than 10\% of facility-years (Other Solid, Peat) are dropped, shares
+renormalized, and facilities with no remaining fuel coverage are excluded from the sample (although
+there were no such facilities).
 
 \subsubsection{ETS Policy Exposure Variables}
 
@@ -279,17 +278,20 @@ Positive shortfall indicates emissions exceed free allocation.
 
 Facilities with allocation ratios outside the range $[0.01, 20]$ are excluded as likely data errors or non-operating installations.
 
-\paragraph{Emissions Filter (ETS CO$_2$ Only).} For the ETS CO$_2$ outcome analysis, facilities are required to have at least one year with verified emissions $\geq$100 ktCO$_2$/yr to ensure sufficient policy exposure magnitude. This filter is applied \emph{only} to the ETS CO$_2$ analysis panel, \emph{not} to the satellite NOx panel. The satellite outcome has its own detection limits (0.03--0.11 kg/s NOx) based on the Beirle methodology, which are independent of CO$_2$ emissions. Applying a CO$_2$-based filter to the satellite panel would be methodologically incorrect, as facilities with low CO$_2$ emissions may still have detectable NOx signals (e.g., due to high NOx/CO$_2$ ratios from certain fuel types or combustion technologies).
-
 \subsection{Satellite NOx Emission Proxy: Beirle-Style Flux-Divergence}\label{sec:data:beirle}
 
 The satellite outcome variable is constructed using a simplified Beirle-style flux-divergence method, following the approach developed by Beirle et al. \cite{beirle2019,beirle2021,beirle2023}. This method provides physically grounded NOx emission estimates by exploiting the relationship between wind-driven advection and local emissions.
 
 \subsubsection{Identification versus Quantification}
 
-Beirle et al.'s v2 catalog combines two distinct algorithmic components: (i) an automatic point-source \textit{identification} algorithm that locates emission maxima in the global advection field, and (ii) a \textit{quantification} method that estimates emission rates by spatially integrating advection around each identified source. Crucially, the authors note that ``the quantification of NOx emissions by spatial integration of the corrected advection map could be applied to these locations or \textbf{any other known point source}'' \cite{beirle2023}.
+Beirle et al.'s v2 catalog combines two distinct algorithmic components: (i) an automatic
+point-source \textit{identification} algorithm that locates emission maxima in the global advection
+field, and (ii) a \textit{quantification} method that estimates emission rates by spatially
+integrating advection around each identified source. Crucially, the authors note that ``the
+quantification of NOx emissions by spatial integration of the corrected advection map could be
+applied to these locations or \textit{any other known point source}'' \cite{beirle2023}.
 
-In this study, I \textit{skip the identification step} because I already have a curated set of ETS/LCP facilities with reliable coordinates from the European Environment Agency registry. I apply Beirle's quantification method directly to these known source locations. This design choice is explicitly endorsed by the authors' statement and is conceptually appropriate: the identification algorithm is needed only when constructing a global catalog without prior knowledge of emission sources, not when applying the physically grounded quantification to facilities whose locations are already known.
+In this study, I \textit{skip the identification step} because I already have a curated set of ETS/LCP facilities with reliable coordinates from the European Environment Agency registry. I apply Beirle's quantification method directly to these known source locations. 
 
 To guard against treating noise as signal, I implement \textit{simplified significance flags} that parallel Beirle's catalog selection criteria:
 \begin{itemize}
@@ -306,7 +308,7 @@ The advection $A$ is defined as the scalar product of wind velocity and the spat
 A = \mathbf{w} \cdot \nabla V = u \frac{\partial V}{\partial x} + v \frac{\partial V}{\partial y}
 \label{eq:advection_def}
 \end{equation}
-where $\mathbf{w} = (u, v)$ is the horizontal wind vector (m/s) from ERA5-Land and $V$ is the NO$_2$ TVCD (molecules/m$^2$). Under the continuity equation, this advection is proportional to local emissions minus chemical sinks.
+where $\mathbf{w} = (u, v)$ is the horizontal wind vector (m/s) from ERA5-Land and $V$ is the NO$_2$ TVCD (molec/m$^2$). Under the continuity equation, this advection is proportional to local emissions minus chemical sinks.
 
 For each facility $i$ and day $d$, spatial gradients are computed on a local grid (30 km $\times$ 30 km centered on the facility) using finite differences on the TROPOMI L3 lat--lon grid:
 \begin{align}
@@ -328,7 +330,7 @@ Following Beirle et al., I apply a fixed scaling factor of $c_{\text{NOx}} = 1.3
 
 \subsubsection{Topographic Correction}
 
-Over mountainous terrain, 3D radiative transfer effects cause systematic artifacts in the advection field \cite{sun2022}. Following Beirle et al. \cite{beirle2023} Sect. 3.7, I apply a topographic correction:
+Over mountainous terrain, 3D radiative transfer effects cause systematic artifacts in the advection field. Following Beirle et al. \cite{beirle2023} Sect. 3.7, I apply a topographic correction:
 \begin{equation}
 A^* = A + f \cdot C_{\text{topo}}, \quad C_{\text{topo}} = \frac{V}{H_{\text{sh}}} \cdot (\mathbf{w}_0 \cdot \nabla z_0)
 \label{eq:topo_correction}
@@ -356,7 +358,7 @@ c_\tau = \exp(t_r / \tau)
 \end{equation}
 where $\tau$ is the effective NOx lifetime, parameterized as a function of latitude following Lange et al. \cite{lange2022} via Beirle et al. Eq. (10):
 \begin{equation}
-\tau(\text{lat}) = 1.0089 \times \exp(0.0242 \times (|\text{lat}| + 9.6024)) \quad \text{[hours]}
+\tau(\text{lat}) = 1.0089 \times \exp(0.0242 \times (|\text{lat}| + 9.6024)) \quad \text{[hmys]}
 \label{eq:tau_lat}
 \end{equation}
 with typical values of 2 h at low latitudes to 4--6 h at higher latitudes. For detected point sources, the resulting $c_\tau \approx 1.40 \pm 0.24$. Following Beirle et al., I assume 50\% relative uncertainty in $\tau$ due to high variability at similar latitudes.
@@ -374,20 +376,20 @@ Converting from mol/s to kg/s using the molar mass of NO$_2$ (46.0055 g/mol) \ci
 
 Following Beirle et al. \cite{beirle2023} Sect. 3.12, the satellite-derived NOx estimates carry uncertainty from multiple sources, combined in quadrature:
 \begin{itemize}
-    \item \textbf{Statistical error} (Sect. 3.12.2): I approximate using the standard error of the temporal mean of daily integrated emissions, rather than Beirle's per-pixel SE propagation. This is more conservative as it captures meteorological variability in addition to sampling noise, typically $<$10\%. Facilities with statistical relative error $\geq$30\% are flagged via \texttt{rel\_err\_stat\_lt\_0\_3}.
+    \item \textbf{Statistical error} (Sect. 3.12.2): I approximate using the standard error of the temporal mean of daily integrated emissions, rather than Beirle's per-pixel SE propagation. This is more conservative as it captures meteorological variability in addition to sampling noise, typically $<$10\%. Facilities with statistical relative error $\geq$30\% are flagged.
     \item \textbf{Lifetime correction} (Sect. 3.12.1): 50\% relative uncertainty in $\tau$, propagated through $c_\tau = \exp(t_r/\tau)$ yielding $\sigma_{c_\tau}/c_\tau = \ln(c_\tau) \times 0.50$, typically 10--20\% for $c_\tau \approx 1.4$.
     \item \textbf{NOx/NO$_2$ scaling} (Sect. 3.12.1): $\pm 0.10$ on 1.38 ratio, $\sim$7\%.
     \item \textbf{AMF correction} (Sect. 3.12.1): \textit{Unmodeled structural uncertainty}---I do not implement an explicit AMF correction. A 10\% term is carried as a generic structural uncertainty following Beirle's error budget, representing potential bias rather than fitted variance.
     \item \textbf{Plume height} (Sect. 3.12.3): \textit{Unmodeled structural uncertainty}---I do not implement plume-height-dependent wind interpolation. A 10\% term represents the sensitivity to assumed height (500m vs 300m) as reported by Beirle.
     \item \textbf{Topographic correction} (Sect. 3.12.4): 33\% uncertainty on $f=1.5$, typically $<$2.5\% for flat European terrain.
-    \item \textbf{OFFL vs PAL product} (our addition): OFFL provides 10--40\% lower TVCDs than PAL; a 25\% structural uncertainty term is added to account for this systematic difference.
+    \item \textbf{OFFL vs PAL product} (my addition): OFFL provides 10--40\% lower TVCDs than PAL; a 25\% structural uncertainty term is added to account for this systematic difference.
 \end{itemize}
 
-Beirle et al. report total uncertainties in the 20--40\% range. With the OFFL product uncertainty and unmodeled structural terms, our typical total is $\sim$35--45\%.
+Beirle et al. report total uncertainties in the 20--40\% range. With the OFFL product uncertainty and unmodeled structural terms, my typical total is $\sim$35--45\%.
 
-\textbf{Uncertainty-based sample restriction.} Observations with total relative uncertainty exceeding 50\% are excluded from the satellite panel, as high-uncertainty observations add noise without proportional information content. For the remaining observations, I construct inverse-variance weights $w_i = 1/\sigma_i^2$ (capped at the 99th percentile to limit extreme weights), which are used as robustness checks via weighted least squares estimation. This approach follows standard practice in meta-analysis and measurement error literatures, where weighting by precision yields efficient estimates when observation-specific variances are known.
+Observations with total relative uncertainty exceeding 50\% are excluded from the satellite panel, as high-uncertainty observations add noise without proportional information content. For the remaining observations, I construct inverse-variance weights $w_i = 1/\sigma_i^2$ (capped at the 99th percentile to limit extreme weights), which are used as robustness checks via weighted least squares estimation. This approach follows standard practice in meta-analysis and measurement error literatures, where weighting by precision yields efficient estimates when observation-specific variances are known.
 
-\textbf{Detection limits and significance flags.} In addition to the uncertainty filter, I implement boolean significance flags:
+In addition to the uncertainty filter, I implement boolean significance flags:
 \begin{itemize}
     \item \texttt{above\_dl\_0\_11}: Emission estimate $\geq$ 0.11~kg/s (Beirle's standard detection limit for non-desert conditions, appropriate for Europe).
     \item \texttt{above\_dl\_0\_03}: Emission estimate $\geq$ 0.03~kg/s (Beirle's permissive threshold, valid only under ideal high-albedo desert conditions---not applicable to Europe).
@@ -405,7 +407,7 @@ The final analysis sample is constructed by applying the following filters to bo
     \item At least 3 years of complete data within 2018--2023
 \end{enumerate}
 
-The resulting \textbf{base analysis panel} contains 521 facilities observed over 2,819 facility-years. This panel is used directly for the verified CO$_2$ outcome.
+The resulting base analysis panel contains 521 facilities observed over 2,819 facility-years. This panel is used directly for the verified CO$_2$ outcome.
 
 For the satellite NOx outcome, additional attrition occurs due to:
 \begin{enumerate}
@@ -423,7 +425,7 @@ Table~\ref{tab:sample} summarizes the sample characteristics for the base analys
 %% ========================================================================
 \subsection{Geographic Context: AlphaEarth Embeddings}\label{sec:data:embeddings}
 
-A key methodological contribution of this study is the incorporation of high-dimensional geospatial foundation model embeddings as control variables, following the recent trend toward using learned representations for causal inference \cite{veitch2019,chernozhukov2018}. I use Google AlphaEarth Foundations \cite{alphaearth2025}, a geospatial embedding field model that produces 64-dimensional representations from multi-source satellite imagery (Sentinel-1/2, Landsat), climate reanalysis (ERA5-Land), topography (GLO-30), and geotagged text (Wikipedia, GBIF). The model is trained using contrastive learning objectives that encourage embeddings to capture information predictive of diverse downstream tasks---from land cover classification to biophysical variable estimation---without being tuned for any specific application.
+A key methodological contribution of this study is the incorporation of high-dimensional geospatial foundation model embeddings as control variables, following the recent trend toward using learned representations for causal inference \cite{veitch2019,chernozhukov2018}. I use Google AlphaEarth Foundations \cite{alphaearth2025}, a geospatial embedding field model that produces 64-dimensional representations from multi-source satellite imagery (Sentinel-1/2, Landsat), climate reanalysis (ERA5-Land), topography (GLO-30), and geotagged text (Wikipedia, GBIF). The model is trained using contrastive learning objectives that encmyage embeddings to capture information predictive of diverse downstream tasks---from land cover classification to biophysical variable estimation---without being tuned for any specific application.
 
 For each facility location, the embedding vector $\mathbf{e}_i \in \mathbb{R}^{64}$ is extracted from the nearest grid cell at 10-meter spatial resolution. These embeddings encode:
 \begin{itemize}
@@ -436,7 +438,9 @@ For each facility location, the embedding vector $\mathbf{e}_i \in \mathbb{R}^{6
 
 The embedding dimensions are included as controls in the econometric specifications, providing a data-efficient approach to capturing between-unit heterogeneity arising from local geographic context. This application extends prior work on text embeddings for causal inference \cite{veitch2019} to the geospatial domain. The approach is particularly relevant for difference-in-differences settings where high-dimensional spatial confounders may induce violations of parallel trends if left uncontrolled \cite{zimmert2018}---for example, if facilities in different geographic contexts (coastal versus inland, urban versus rural) experience different secular trends in air quality unrelated to policy.
 
-Since the embeddings are derived from satellite imagery aggregated over time, they are treated as static facility-level controls. The 64 dimensions are included directly without dimensionality reduction, as the panel fixed effects structure provides regularization against overfitting. This represents 64 bytes per location---a highly compressed representation of the local geographic and climate context that would require hundreds of manually-specified variables to approximate. As discussed in Section~\ref{sec:methods:outcome-specific}, these embeddings are applied only to the satellite NOx outcome.
+The embeddings are extracted annually from the \texttt{GOOGLE/SATELLITE\_EMBEDDING/V1/ANNUAL} ImageCollection, yielding time-varying controls that capture year-to-year changes in land use, vegetation phenology, and built environment. This temporal variation is methodologically important: unlike static facility-level controls (which would be absorbed by facility fixed effects), annual embeddings can adjust for time-varying geographic confounders that might bias the satellite NOx outcome.
+
+To address overfitting concerns with 64 dimensions, I apply dimensionality reduction (PCA or PLS to 10 components) as detailed in Section~\ref{sec:methods:embedding-reduction}. For PLS, the projection is trained on facility-level mean NOx (cross-sectional) rather than panel observations, ensuring the reduced embeddings are time-invariant and equivalent to pre-treatment covariates---this prevents regularization bias from outcome snooping \cite{chernozhukov2018}. As discussed in Section~\ref{sec:methods:outcome-specific}, embeddings are applied only to the satellite NOx outcome.
 
 \subsection{Exploratory Data Analysis}\label{sec:data:eda}
 
@@ -518,11 +522,15 @@ Figure~\ref{fig:verified_allocated} illustrates the relationship between verifie
 
 Figure~\ref{fig:beirle_eda} presents the key characteristics of the satellite-derived NOx emission estimates. After applying the $\leq$50\% total uncertainty filter required for inclusion in the satellite panel, 291 facilities (1,213 facility-years) remain from the base panel of 521 facilities.
 
-The top-left panel shows the distribution of estimated NOx emission rates. The mean emission rate is 0.065~kg/s, substantially below the generic detection limit of 0.11~kg/s (dashed red line) from Beirle et al. (2023). This indicates that most facilities in the sample have emissions near or below the satellite detection threshold, which will necessitate careful treatment in the regression analysis. Negative estimates (statistical noise) are present for the lowest emitters.
+The top-left panel shows the distribution of estimated NOx emission rates. The mean emission rate is 0.065~kg/s, substantially below the generic detection limit of 0.11~kg/s (dashed red line) from Beirle et al. (2023). This indicates that most facilities in the sample have emissions near or below the satellite detection threshold, which necessitates careful treatment in the regression analysis. Negative estimates (statistical noise) are present for the lowest emitters.
 
 The top-right panel displays the lifetime correction factor ($c_\tau$) distribution, with a mean of 1.38 (expected range 1.2--1.8). This factor accounts for NOx chemical decay during atmospheric transport and is computed from the latitude-dependent lifetime parameterization of Lange et al. (2022). The narrow distribution confirms that European facilities fall within the expected mid-latitude range.
 
-The bottom-left panel shows the total relative uncertainty distribution, with a median of 39.2\%. This uncertainty combines statistical integration error, lifetime correction uncertainty ($\pm$50\%), NO$_2$/NOx ratio uncertainty ($\pm$10\%), and satellite product-related errors. The \texttt{nox\_weight} variable ($= 1/\sigma^2_{\text{rel}}$) provides inverse-variance weights for regression analysis.
+The bottom-left panel shows the total relative uncertainty distribution, with a median of 39.2\%.
+This uncertainty combines statistical integration error, lifetime correction uncertainty
+($\pm$50\%), NO$_2$/NOx ratio uncertainty ($\pm$10\%), and satellite product-related errors. I use
+the uncertainty to add an inverse-variance weight ($=
+1/\sigma^2_{\text{rel}}$) to my regression terms.
 
 The bottom-right panel shows satellite observation coverage, with a mean of 139 valid observation days per facility-year. This exceeds the minimum threshold of 20 days and provides substantial temporal averaging to reduce noise. Coverage varies due to cloud screening, wind speed filtering ($\geq$2~m/s), and satellite orbit patterns.
 
@@ -705,14 +713,14 @@ The Beirle-style flux-divergence approach addresses atmospheric confounding by f
 };
 
 \end{tikzpicture}
-\caption{Directed acyclic graph for dual-outcome causal inference. Treatment $P_{it}$ (allocation ratio) affects both verified CO$_2$ and satellite NOx outcomes. Gray dashed arrows from $U_i$ and $U_{rt}$ are absorbed by facility and region$\times$year fixed effects, respectively. Red arrows from $U_{it}$ indicate residual confounding from time-varying unobservables (dispatch, maintenance) that we intentionally leave uncontrolled to preserve the mediation pathway (orange). The ex-post arrow reflects that allocation ratios are mechanically computed from prior verified emissions. Observed controls $X_{it}$ (capacity, fuel) affect both outcomes; $G_i$ (embeddings) and $W_{it}$ (wind) affect only the satellite outcome.}\label{fig:dag}
+\caption{(NEEDS WORK) Directed acyclic graph for dual-outcome causal inference. Treatment $P_{it}$ (allocation ratio) affects both verified CO$_2$ and satellite NOx outcomes. Gray dashed arrows from $U_i$ and $U_{rt}$ are absorbed by facility and region$\times$year fixed effects, respectively. Red arrows from $U_{it}$ indicate residual confounding from time-varying unobservables (dispatch, maintenance) that I intentionally leave uncontrolled to preserve the mediation pathway (orange). The ex-post arrow reflects that allocation ratios are mechanically computed from prior verified emissions. Observed controls $X_{it}$ (capacity, fuel) affect both outcomes; $G_i$ (embeddings) and $W_{it}$ (wind) affect only the satellite outcome.}\label{fig:dag}
 \end{figure}
 
 \subsection{Identification Strategy and Variable Selection}\label{sec:methods:identification}
 
 The identification strategy relies on two key choices: (i) what to control for, and (ii) what \textit{not} to control for. Both are essential to avoid bias.
 
-\subsubsection{Why We Control for Region$\times$Year Effects}
+\subsubsection{Region$\times$Year Effects}
 
 Regional electricity demand, fuel prices, and economic conditions create time-varying confounding: demand shocks increase plant utilization, raising both verified emissions (lowering $R_{it}$) and NO$_2$ output. Without adjustment, this creates spurious correlation between policy stringency and pollution.
 
@@ -720,23 +728,27 @@ Region$\times$Year fixed effects absorb these common shocks additively. The iden
 
 I use NUTS2 regions (Nomenclature of Territorial Units for Statistics, level 2) from Eurostat for clustering. NUTS2 regions ($\sim$200--300 across the EU) define economically coherent regional units that share common labor markets, policy enforcement mechanisms, and infrastructure characteristics. Unlike PyPSA-Eur power system clusters (which are appropriate for electricity sector heterogeneity analysis), NUTS2 regions apply to all industrial facility types---power plants, refineries, cement plants---and correspond to administrative units where regional policies are implemented and enforced. This makes them appropriate for absorbing regional time-varying confounders that affect facilities regardless of their sectoral activity.
 
-\subsubsection{Why We Do Not Control for $U_{it}$ (Plant-Level Time-Varying Unobservables)}
+\subsubsection{Omission of $U_{it}$ (Facility-Level Time-Varying Unobservables)}
 
-Plant-level time-varying unobservables ($U_{it}$) include dispatch/utilization, maintenance status, operational efficiency changes, and idiosyncratic output demand. These variables---particularly dispatch---present a ``bad control'' problem because dispatch is simultaneously:
+Facility-level time-varying unobservables ($U_{it}$) include dispatch/utilization, maintenance status, operational efficiency changes, and output demand. These variables---particularly dispatch---present a ``bad control'' problem because dispatch is simultaneously:
 \begin{enumerate}
-    \item \textbf{A confounder}: Demand shocks $\to$ higher dispatch $\to$ higher verified emissions $\to$ lower $R_{it}$. The same shocks $\to$ more combustion $\to$ higher NO$_2$.
-    \item \textbf{A potential mediator}: If policy affects merit order bidding (facilities with carbon shortfalls bid higher $\to$ get dispatched less), then: $P_{it} \to U_{it} \to Y_{it}$.
+    \item A confounder: Demand shocks $\to$ higher dispatch $\to$ higher verified emissions $\to$ lower $R_{it}$. The same shocks $\to$ more combustion $\to$ higher NO$_2$.
+    \item A potential mediator: If policy affects merit order bidding (facilities with carbon shortfalls bid higher $\to$ get dispatched less), then: $P_{it} \to U_{it} \to Y_{it}$.
 \end{enumerate}
 
-Controlling for $U_{it}$ (or proxies such as generation data) would absorb both effects. The confounding component should be removed, but blocking the mediation pathway would attenuate the true policy effect toward zero. Since we cannot empirically separate these components without strong assumptions about the dispatch mechanism, we do not control for $U_{it}$ directly. Instead, Region$\times$Year FE absorbs the common (regional) component of $U_{it}$---since dispatch responds primarily to regional demand and fuel prices---leaving only facility-specific deviations as residual confounding. These facility-specific deviations are plausibly second-order and orthogonal to the allocation ratio conditional on capacity and fuel mix controls.
-
-\subsubsection{Why Not Facility$\times$Year Fixed Effects?}
-
-Facility$\times$year fixed effects ($\alpha_{it}$) would absorb \textit{all} within-facility-year variation. Since treatment varies at the facility-year level, this leaves no variation to identify $\beta$. More subtly, interactive fixed effects models (which estimate facility-specific responses to common time factors) risk similar problems: if the estimated factor loadings correlate with how allocations were assigned, conditioning on them may open backdoor paths through the allocation mechanism or block mediation pathways.
+Controlling for $U_{it}$ (or proxies such as generation data) would absorb both effects. The
+confounding component should be removed, but blocking the mediation pathway would attenuate the true
+policy effect toward zero. Since we cannot empirically separate these components without strong
+assumptions about the dispatch mechanism, I do not control for $U_{it}$ directly. Instead,
+Region$\times$Year FE absorbs the common (regional) component of $U_{it}$---since dispatch responds
+primarily to regional demand and fuel prices---leaving only facility-specific deviations as residual
+confounding.
 
 \subsubsection{Addressing Simultaneity in the Allocation Ratio}
 
-The allocation ratio $R_{it} = A_{it} / V_{it}$ involves current-year verified emissions $V_{it}$ in the denominator, creating apparent simultaneity. However, the \textbf{temporal structure of EU ETS compliance} eliminates this concern. The annual compliance cycle proceeds as follows:
+The allocation ratio $R_{it} = A_{it} / V_{it}$ involves current-year verified emissions $V_{it}$ in
+the denominator, creating apparent simultaneity. However, the temporal structure of EU ETS
+compliance eliminates this concern. The annual compliance cycle proceeds as follows:
 \begin{enumerate}
     \item \textbf{Free allocation granted} (28 February of year $t$): Competent authorities issue free allowances $A_{it}$ to each installation based on predetermined benchmarks \cite{ecets2023revision}.
     \item \textbf{Emissions occur} (throughout year $t$): Facilities make operational decisions---dispatch, fuel choice, maintenance---knowing their allocation $A_{it}$.
@@ -744,7 +756,7 @@ The allocation ratio $R_{it} = A_{it} / V_{it}$ involves current-year verified e
     \item \textbf{Allowances surrendered} (30 April of year $t+1$): Facilities surrender allowances equal to verified emissions.
 \end{enumerate}
 
-The key insight is that $A_{it}$ is \textbf{known before} emissions decisions are made. Facilities observe their allocation at the start of the year and adjust operations accordingly. The causal direction is unambiguous: $A_{it} \to \text{decisions} \to V_{it}$. The dashed arrow from $Y_{it}^{\text{CO}_2}$ to $P_{it}$ in Figure~\ref{fig:dag} represents the ex-post calculation of the ratio, not reverse causation within the compliance period.
+The key insight is that $A_{it}$ is \textit{known before} emissions decisions are made. Facilities observe their allocation at the start of the year and adjust operations accordingly. The causal direction is unambiguous: $A_{it} \to \text{decisions} \to V_{it}$. The dashed arrow from $Y_{it}^{\text{CO}_2}$ to $P_{it}$ in Figure~\ref{fig:dag} represents the ex-post calculation of the ratio, not reverse causation within the compliance period.
 
 Within the econometric design, Region$\times$Year FE absorbs common drivers of dispatch variation (carbon prices, regional demand, fuel prices). The remaining cross-facility variation in $R_{it}$ within a region-year reflects primarily differences in predetermined allocations $A_{it}$ rather than differences in current dispatch.
 
@@ -752,7 +764,11 @@ To the extent that endogenous dispatch variation contaminates $R_{it}$ through t
 
 \subsubsection{Residual Threats and Interpretation}
 
-The primary residual threat is facility-specific time-varying confounding ($U_{it}$)---maintenance outages, unexpected efficiency changes, or idiosyncratic demand for a specific plant's output. These are plausibly second-order and unlikely to systematically correlate with allocation ratios conditional on our controls. Future work incorporating plant-level generation data could address this directly; a discussion of economic dispatch and power system optimization is reserved for subsequent analysis.
+The primary residual threat is facility-specific time-varying confounding ($U_{it}$)---maintenance
+outages, unexpected efficiency changes, or demand for a specific plant's output (dispatch). These
+are unlikely to systematically correlate with allocation ratios conditional
+on my controls. Future work incorporating plant-level generation data could address this directly;
+inclusion of economic dispatch and power system optimization (potentially also from \texttt{PyPSA-EUR}) is reserved for subsequent analysis.
 
 \subsubsection{Outcome-Specific Controls}\label{sec:methods:outcome-specific}
 
@@ -773,7 +789,10 @@ The raw AlphaEarth embeddings (64 dimensions) may introduce overfitting concerns
 
 \textbf{Facility-level PLS (supervised)}: Partial least squares regression projects embeddings onto directions that predict the outcome. However, naive application of PLS to panel data creates \textit{regularization bias}: the learned projection incorporates information from year-specific outcome shocks, violating the requirement that controls be pre-determined \cite{chernozhukov2018}. This is analogous to the ``bad controls'' problem identified by \cite{cinelli2022}: if the projection learns to predict treatment-affected variation in the outcome, controlling for the reduced embeddings biases the treatment effect estimate.
 
-I address this by training PLS on \textbf{facility-level means} (one observation per facility) rather than panel observations. Let $\bar{Y}_i^{\text{NOx}} = T^{-1} \sum_t Y_{it}^{\text{NOx}}$ denote the time-averaged NOx emission rate for facility $i$. The PLS projection is learned from the cross-sectional regression:
+I address this by training PLS on facility-level means (one observation per facility)
+rather than panel observations. Let $\bar{Y}_i^{\text{NOx}} = T^{-1} \sum_t Y_{it}^{\text{NOx}}$
+denote the time-averaged NOx emission rate for facility $i$ for all years in the panel. The PLS projection is learned from the
+cross-sectional regression:
 \begin{equation}
 \bar{Y}_i^{\text{NOx}} = \mathbf{e}_i' \boldsymbol{\gamma} + \eta_i
 \label{eq:pls_training}
@@ -783,28 +802,7 @@ where $\mathbf{e}_i \in \mathbb{R}^{64}$ is the embedding vector and $\boldsymbo
 This design ensures the reduced embeddings are \textit{time-invariant} within each facility, making them equivalent to pre-treatment covariates. The projection captures between-facility variation in geographic context predictive of NOx levels, while being orthogonal to within-facility treatment variation. This is analogous to the sample-splitting approach in double/debiased machine learning \cite{chernozhukov2018}, where nuisance parameters are estimated on auxiliary data to prevent overfitting bias.
 
 I report results using both PCA-reduced embeddings (10 components) and facility-level PLS embeddings (10 components). Stability of treatment effect estimates across these specifications supports the claim that results are not sensitive to the embedding representation.
-
-\subsection{Treatment Definitions}\label{sec:methods:treatment}
-
-\subsubsection{Continuous Treatment}
-
-The primary treatment variable is the allocation ratio $R_{it}$ (Equation~\ref{eq:allocratio}). Lower values indicate greater policy stringency---facilities must purchase more allowances on the carbon market when $R_{it} < 1$. The expected effect is that lower allocation ratios induce emissions reductions, leading to lower verified CO$_2$ and correspondingly lower satellite-derived NOx (as NOx is a combustion co-pollutant).
-
-\subsubsection{Discrete Treatment for Staggered DiD}
-
-For the Callaway-Sant'Anna estimator, I define a binary treatment indicator:
-\begin{equation}
-D_{it} = \mathbf{1}\{R_{it} < 1\}
-\label{eq:treated}
-\end{equation}
-where $\mathbf{1}\{\cdot\}$ is the indicator function. Treatment onset (cohort assignment) is defined as the first year a facility becomes treated:
-\begin{equation}
-G_i = \min\{t : D_{it} = 1\}
-\label{eq:cohort}
-\end{equation}
-Facilities never treated are assigned $G_i = 0$ (the never-treated control group).
-
-\subsection{TWFE with Continuous Treatment}\label{sec:methods:twfe}
+\subsection{Two-Way Fixed Effects (TWFE)}\label{sec:methods:twfe}
 
 The main two-way fixed effects specification uses facility and region$\times$year fixed effects:
 \begin{equation}
@@ -826,21 +824,17 @@ The coefficient $\beta$ is identified from within-facility variation in allocati
 
 Standard errors are clustered at the NUTS2 region level. NUTS2 regions ($\sim$200--300 across the EU) define economically coherent regional units that share common labor markets, policy enforcement mechanisms, and infrastructure characteristics.
 
-\subsection{Why Callaway-Sant'Anna Is Not Feasible}\label{sec:methods:csdid}
+\subsection{Callaway-Sant'Anna Infeasibility}\label{sec:methods:csdid}
 
-I initially planned to complement the TWFE analysis with the Callaway and Sant'Anna \cite{callaway2021} estimator, which addresses potential bias in standard TWFE when treatment timing varies across units and treatment effects are heterogeneous. However, this approach proved infeasible due to the structure of the data.
-
-The CS-DiD estimator requires observing units \textit{before} they first receive treatment to establish parallel pre-trends. In my setting, defining treatment as allocation ratio $R_{it} < 1$, the ``cohort'' is the first year a facility crosses this threshold. The EU ETS has operated since 2005, and by the start of my panel (2018), the vast majority of facilities that would ever face allocation shortfalls were already in that state:
+As discussed in Section~\ref{sec:background:staggered}, the Callaway-Sant'Anna estimator is infeasible with this panel because 84.5\% of ever-treated facilities were already treated in 2018---the first panel year. The cohort distribution is:
 
 \begin{itemize}
-    \item Of 457 ever-treated facilities, \textbf{386 (84.5\%)} were already treated in 2018
-    \item Only 71 facilities (15.5\%) first crossed the threshold during 2019--2023
-    \item After excluding treatment reversers ($\sim$25\% of facilities), later cohorts have $<$10 units each
+    \item 2018 cohort: 386 facilities (84.5\% of ever-treated)
+    \item 2019--2023 cohorts: 71 facilities total (15.5\%), with $<$10 per cohort after excluding reversers
+    \item Never-treated: 64 facilities
 \end{itemize}
 
-With 2018 as both the first panel year and the dominant cohort, there are no pre-treatment observations for most treated units. The CS-DiD estimator cannot identify treatment effects without this variation. Extending the panel backward to 2013--2017 (EU ETS Phase 3) could enable event-study analysis in future work.
-
-I therefore rely on TWFE with continuous treatment, which does not require discrete cohort definitions and exploits within-facility variation in allocation ratios over time.
+This left-truncation of treatment timing precludes event-study analysis. I therefore use TWFE with continuous treatment, exploiting within-facility variation in allocation ratios.
 
 \subsection{NUTS2-Based Clustering for Inference}\label{sec:methods:clustering}
 
@@ -863,33 +857,26 @@ This clustering approach has a theoretical justification grounded in recent work
 
 This represents a novel application of model-derived clustering for econometric inference. Rather than using geographic proximity (which ignores network topology), administrative boundaries (which may cut across electrically-connected regions), or data-driven clustering on outcome variables (which risks overfitting), I use clusters computed from features of an external domain-specific model---the power system transmission network---that captures the economically-relevant correlation structure a priori. For this analysis, the 128-region resolution is used, providing sufficient granularity to capture sub-national variation while maintaining adequate within-region sample sizes for clustered inference. Each facility is assigned to the PyPSA-Eur cluster containing the nearest network bus.
 
-Let $r \in \{1, \ldots, R\}$ index NUTS2 regions. The cluster-robust variance estimator for the TWFE coefficient is:
-\begin{equation}
-\widehat{\text{Var}}(\hat{\beta}) = \left(\mathbf{X}'\mathbf{M}\mathbf{X}\right)^{-1} \left(\sum_{r=1}^{R} \mathbf{X}_r'\hat{\mathbf{u}}_r\hat{\mathbf{u}}_r'\mathbf{X}_r\right) \left(\mathbf{X}'\mathbf{M}\mathbf{X}\right)^{-1}
-\label{eq:clustervar}
-\end{equation}
-where $\mathbf{M}$ is the residual maker for fixed effects and $\hat{\mathbf{u}}_r$ are residuals for observations in NUTS2 region $r$.
-
 \subsection{Summary of Specifications}\label{sec:methods:summary}
 
 Table~\ref{tab:specs} summarizes the five core specifications estimated in this study. The dual-outcome design with two embedding reduction strategies yields five TWFE specifications.
 
-\textbf{Sample Definitions.} ETS CO$_2$ analysis uses the full panel of facilities with valid verified emissions. Satellite NOx analysis \textit{always} applies detection limit filtering---observations below the detection threshold are excluded. I estimate NOx specifications at two detection limits: (1) a permissive threshold of $\geq 0.03$ kg/s, which maximizes sample size; and (2) a conservative threshold of $\geq 0.11$ kg/s following \citet{beirle2019}, which restricts to higher-quality signals. The conservative sample serves as a robustness check.
+\textbf{Sample Definitions.} ETS CO$_2$ analysis uses the full panel of facilities with valid verified emissions. Satellite NOx analysis \textit{always} applies detection limit filtering---observations below the detection threshold are excluded. I estimate NOx specifications at two detection limits: (1) a permissive threshold of $\geq 0.03$ kg/s, which maximizes sample size; and (2) a conservative threshold of $\geq 0.11$ kg/s following \cite{beirle2019}, which restricts to higher-quality signals. The conservative sample serves as a robustness check.
 
 \begin{table}[h]
 \caption{Summary of Econometric Specifications}\label{tab:specs}%
-\begin{tabular*}{\textwidth}{@{\extracolsep\fill}cllll}
+\begin{tabular*}{\textwidth}{@{\extracolsep\fill}clll}
 \toprule
-Spec & Outcome & Sample & Embedding & Estimator \\
+Spec & Outcome & Sample & Embedding \\
 \midrule
-1 & ETS CO$_2$ & Full (521 facilities) & None & TWFE \\
-2 & Satellite NOx & DL $\geq 0.03$ kg/s & PCA (10 dims) & TWFE \\
-3 & Satellite NOx & DL $\geq 0.03$ kg/s & PLS (10 dims) & TWFE \\
-4 & Satellite NOx & DL $\geq 0.11$ kg/s & PCA (10 dims) & TWFE \\
-5 & Satellite NOx & DL $\geq 0.11$ kg/s & PLS (10 dims) & TWFE \\
+1 & ETS CO$_2$ & Full (521 facilities) & None \\
+2 & Satellite NOx & DL $\geq 0.03$ kg/s & PCA (10 dims) \\
+3 & Satellite NOx & DL $\geq 0.03$ kg/s & PLS (10 dims) \\
+4 & Satellite NOx & DL $\geq 0.11$ kg/s & PCA (10 dims) \\
+5 & Satellite NOx & DL $\geq 0.11$ kg/s & PLS (10 dims) \\
 \botrule
 \end{tabular*}
-\footnotetext{Note: ETS CO$_2$ uses no embeddings because geographic context does not affect administrative data measurement. For satellite NOx, PCA provides an unsupervised (outcome-agnostic) projection while PLS provides a supervised projection trained on facility-level mean NOx to ensure causal validity (Section~\ref{sec:methods:embeddings}). NOx analysis \textit{never} uses unfiltered samples---all NOx specifications require detection limit filtering. All specifications use Facility + Region$\times$Year fixed effects and cluster standard errors by NUTS2 region.}
+\footnotetext{Note: ETS CO$_2$ uses no embeddings because geographic context does not affect administrative data measurement. For satellite NOx, PCA provides an unsupervised (outcome-agnostic) projection while PLS provides a supervised projection trained on facility-level mean NOx to ensure causal validity (Section~\ref{sec:methods:embedding-reduction}). NOx analysis \textit{never} uses unfiltered samples---all NOx specifications require detection limit filtering. All specifications use Facility + Region$\times$Year fixed effects and cluster standard errors by NUTS2 region.}
 \end{table}
 
 %% ========================================================================
@@ -897,109 +884,254 @@ Spec & Outcome & Sample & Embedding & Estimator \\
 %% ========================================================================
 \section{Results}\label{sec:results}
 
-\textit{[Results to be added upon completion of empirical analysis.]}
+This section presents estimation results for the five TWFE specifications, heterogeneity analysis across facility characteristics, and robustness checks. The main finding is a robust negative relationship between allocation ratio and verified CO$_2$ emissions, with weaker and noisier effects for satellite-derived NOx that become significant only at conservative detection limits.
 
-This section will present:
-\begin{enumerate}
-    \item Descriptive statistics on treatment and outcome distributions
-    \item Estimates for all five specifications (Table~\ref{tab:specs})
-    \item Comparison of CO$_2$ and NOx responses: agreement in sign and magnitude
-    \item Stability of results across embedding strategies (PCA vs PLS) and detection limits
-\end{enumerate}
+\subsection{Treatment Distribution}\label{sec:results:treatment}
 
-\subsection{Treatment Distribution}
+The allocation ratio exhibits substantial variation both across facilities and within facilities over time. The mean allocation ratio is 0.62 with standard deviation 0.85, indicating that the typical facility receives free allowances covering approximately 62\% of its verified emissions. Values range from 0.01 (severe shortfall, must purchase nearly all allowances) to 18.5 (substantial surplus).
 
-The allocation ratio exhibits substantial within-facility variation over the sample period. [Distribution statistics and figures to be added.]
+The electricity sector accounts for 421 facilities (80.8\%) and shows systematically lower allocation ratios (mean 0.52) compared to other sectors (mean 1.03), reflecting the phase-out of free allocation to power generators under EU ETS Phase III/IV.
 
-\subsection{Main Estimates}
+\subsection{Main Estimates}\label{sec:results:main}
 
-Table~\ref{tab:main} reports the main estimation results.
+Table~\ref{tab:main} reports the main TWFE estimation results for all five specifications. The outcome for ETS CO$_2$ is log-transformed verified emissions (log tCO$_2$/yr); the outcome for satellite NOx is the Beirle-style emission rate (kg/s).
 
 \begin{table}[h]
 \caption{Main Estimation Results: Effect of Allocation Ratio on Dual Outcomes}\label{tab:main}%
-\begin{tabular*}{\textwidth}{@{\extracolsep\fill}lcc}
+\begin{tabular*}{\textwidth}{@{\extracolsep\fill}lccccc}
 \toprule
-& Verified CO$_2$ (ktCO$_2$/yr) & Satellite NOx (kg/s) \\
+& \multicolumn{1}{c}{ETS CO$_2$} & \multicolumn{4}{c}{Satellite NOx (kg/s)} \\
+\cmidrule(lr){2-2} \cmidrule(lr){3-6}
+& Full Sample & \multicolumn{2}{c}{DL $\geq$ 0.03} & \multicolumn{2}{c}{DL $\geq$ 0.11} \\
+& & PCA & PLS & PCA & PLS \\
 \midrule
-Allocation Ratio ($R_{it}$) & [--] & [--] \\
-& ([--]) & ([--]) \\
+Allocation Ratio & $-$0.186*** & $-$0.000 & $-$0.000 & $-$0.003** & $-$0.003*** \\
+& (0.030) & (0.000) & (0.000) & (0.001) & (0.000) \\
 \midrule
-Facility FE & Yes & Yes \\
-Region$\times$Year FE & Yes & Yes \\
-Controls & Yes & Yes \\
-\midrule
-Observations & [--] & [--] \\
-Facilities & [--] & [--] \\
-$R^2$ (within) & [--] & [--] \\
+95\% CI & [$-$0.25, $-$0.13] & [$-$0.00, 0.00] & [$-$0.00, 0.00] & [$-$0.00, $-$0.00] & [$-$0.00, $-$0.00] \\
+Observations & 2,723 & 577 & 577 & 140 & 140 \\
+Facility FE & Yes & Yes & Yes & Yes & Yes \\
+Region$\times$Year FE & Yes & Yes & Yes & Yes & Yes \\
+Embedding Controls & No & PCA (10) & PLS (10) & PCA (10) & PLS (10) \\
 \botrule
 \end{tabular*}
-\footnotetext{Note: Standard errors clustered by NUTS2 region in parentheses. ETS CO$_2$ controls include capacity (MW) and fuel shares (coal, gas). Satellite NOx controls additionally include AlphaEarth embeddings (10 PCA or PLS components). NOx sample restricted to observations above detection limit ($\geq 0.03$ kg/s for main specification). * $p<0.10$, ** $p<0.05$, *** $p<0.01$.}
+\footnotetext{Note: Standard errors clustered by NUTS2 region in parentheses. ETS CO$_2$ outcome is log-transformed verified emissions; coefficient of $-$0.186 implies a 0.1 unit decrease in allocation ratio (10\% shortfall) is associated with approximately 1.9\% lower verified emissions. NOx sample restricted to observations above detection limit. PCA explains 89.8\% (DL$\geq$0.03) to 94.5\% (DL$\geq$0.11) of embedding variance; PLS achieves $R^2 = 0.63$ (DL$\geq$0.03) to 0.94 (DL$\geq$0.11) on facility-level mean NOx.\\ * $p<0.10$, ** $p<0.05$, *** $p<0.01$.}
 \end{table}
 
-\subsection{Robustness}
+\subsubsection{Verified CO$_2$ Emissions}
 
-[Robustness analysis to be added, including:]
+The ETS CO$_2$ specification yields a highly significant negative coefficient of $-$0.186 (SE = 0.030, $p < 0.001$), with 95\% confidence interval [$-$0.246, $-$0.127]. This estimate implies that a 0.1 unit decrease in the allocation ratio---equivalent to moving from full free allocation ($R = 1.0$) to a 10\% shortfall position ($R = 0.9$)---is associated with approximately 1.9\% lower verified CO$_2$ emissions.
+
+To interpret the economic magnitude: at the sample mean of 580 ktCO$_2$/yr, this corresponds to a reduction of approximately 11 ktCO$_2$ per 0.1 unit decrease in allocation ratio. Across the sample, the standard deviation of within-facility allocation ratio changes is 0.42, implying that a one-standard-deviation tightening of policy stringency is associated with approximately 7.8\% lower emissions ($0.42 \times 18.6\%$).
+
+The estimate is robust to the inclusion of capacity and fuel share controls, which absorb variation in facility size and fuel mix that might correlate with both allocation ratios and emissions levels.
+
+\subsubsection{Satellite-Derived NOx}
+
+The satellite NOx results exhibit a striking pattern: estimates are small and statistically insignificant at the permissive detection limit (DL $\geq$ 0.03 kg/s), but become significant and economically meaningful at the conservative detection limit (DL $\geq$ 0.11 kg/s).
+
+\textbf{Permissive detection limit (DL $\geq$ 0.03 kg/s):} The PCA specification yields a coefficient of $-$0.000049 (SE = 0.000243, $p = 0.84$) and the PLS specification yields $-$0.000114 (SE = 0.000245, $p = 0.65$). Neither is statistically distinguishable from zero. This null result is consistent with the measurement properties of the Beirle flux-divergence approach: at the permissive threshold, the sample includes many observations with NOx emission rates below the detection limit (mean = 0.065 kg/s vs. DL = 0.03--0.11 kg/s), where satellite-derived estimates are dominated by noise.
+
+\textbf{Conservative detection limit (DL $\geq$ 0.11 kg/s):} Restricting to observations above Beirle et al.'s standard European detection threshold yields significant negative effects. The PCA specification estimates $-$0.00282 (SE = 0.000589, $p = 0.017$) with 95\% CI [$-$0.0040, $-$0.0017]. The PLS specification estimates $-$0.00301 (SE = 0.000256, $p = 0.001$) with 95\% CI [$-$0.0035, $-$0.0025]. Both indicate that higher allocation ratios are associated with higher satellite-derived NOx emissions, consistent with the CO$_2$ findings.
+
+The magnitude can be interpreted as follows: a 0.1 unit decrease in allocation ratio is associated with approximately 0.0003 kg/s lower NOx emissions. At the conservative sample mean of 0.18 kg/s (observations above detection limit), this represents a 1.7\% reduction---broadly comparable to the 1.9\% CO$_2$ reduction, though the comparison should be made cautiously given the different measurement processes.
+
+\subsubsection{Embedding Reduction Diagnostics}
+
+The PCA and PLS dimensionality reduction methods exhibit different characteristics across detection limit samples:
+
+\textbf{PCA (unsupervised):} At DL $\geq$ 0.03, the first 10 principal components explain 89.8\% of the total variance in the 64-dimensional embedding space. At DL $\geq$ 0.11, variance explained increases to 94.5\%, reflecting reduced heterogeneity in the smaller sample of high-emitting facilities.
+
+\textbf{PLS (supervised):} PLS is trained on facility-level mean NOx to ensure causal validity (Section~\ref{sec:methods:embedding-reduction}). At DL $\geq$ 0.03, training on 200 facilities achieves $R^2 = 0.627$ on the cross-sectional regression of mean NOx on embeddings. At DL $\geq$ 0.11, training on 46 facilities achieves $R^2 = 0.936$, indicating that embeddings are highly predictive of mean NOx levels among high emitters.
+
+The stability of treatment effect estimates across PCA and PLS specifications---particularly at the conservative detection limit where both yield nearly identical coefficients ($-$0.00282 vs. $-$0.00301)---supports the claim that results are not sensitive to the specific embedding representation. This robustness is reassuring given concerns about regularization bias when using supervised dimensionality reduction in causal inference settings.
+
+\subsection{Heterogeneity Analysis}\label{sec:results:heterogeneity}
+
+I examine treatment effect heterogeneity through both split-sample analysis (separate regressions by subgroup) and continuous interaction models.
+
+\subsubsection{Split-Sample Results: ETS CO$_2$}
+
+Table~\ref{tab:het_ets} reports split-sample estimates for verified CO$_2$ emissions across key dimensions.
+
+\begin{table}[h]
+\caption{Heterogeneity in ETS CO$_2$ Treatment Effects}\label{tab:het_ets}%
+\begin{tabular*}{\textwidth}{@{\extracolsep\fill}llcccc}
+\toprule
+Dimension & Group & Coefficient & SE & $p$-value & N \\
+\midrule
+\textit{Sector} & Electricity & $-$0.211*** & 0.040 & 0.000 & 2,173 \\
+& Other Sectors & $-$0.090*** & 0.027 & 0.003 & 443 \\
+\midrule
+\textit{Location} & Urban & $-$0.154*** & 0.039 & 0.000 & 1,943 \\
+& Rural & $-$0.240*** & 0.024 & 0.000 & 650 \\
+\midrule
+\textit{Fuel} & Gas & $-$0.206*** & 0.059 & 0.001 & 1,197 \\
+& Oil & $-$0.445 & 0.328 & 0.208 & 129 \\
+& Coal & $-$0.982*** & 0.174 & 0.000 & 653 \\
+& Biomass & $-$0.105*** & 0.012 & 0.000 & 438 \\
+\midrule
+\textit{Country} & France & $-$0.250*** & 0.034 & 0.000 & 920 \\
+& Poland & $-$0.327*** & 0.049 & 0.000 & 743 \\
+& Sweden & $-$0.109*** & 0.015 & 0.000 & 421 \\
+& Austria & $-$0.242*** & 0.059 & 0.010 & 227 \\
+& Spain & $-$1.254*** & 0.169 & 0.000 & 125 \\
+\botrule
+\end{tabular*}
+\footnotetext{Note: Each row reports a separate regression on the indicated subsample. All specifications include Facility + Region$\times$Year FE and cluster SEs by NUTS2 region. Fuel subsamples defined by dominant fuel type ($>$50\% share). * $p<0.10$, ** $p<0.05$, *** $p<0.01$.}
+\end{table}
+
+\textbf{Sector heterogeneity.} Electricity-sector facilities exhibit stronger policy responsiveness ($\beta = -0.211$) than other industrial sectors ($\beta = -0.090$), with the difference significant at conventional levels. This pattern is consistent with the phase-out of free allocation to power generators, which face more binding carbon constraints than industrial installations receiving carbon leakage protection.
+
+\textbf{Location heterogeneity.} Rural facilities show stronger emission reductions ($\beta = -0.240$) than urban facilities ($\beta = -0.154$). This may reflect differential adjustment costs: urban facilities in dense industrial areas may face greater constraints on fuel switching or output reduction due to district heating obligations or local employment considerations.
+
+\textbf{Fuel heterogeneity.} Coal-dominant facilities exhibit by far the strongest response ($\beta = -0.982$), consistent with coal being the most carbon-intensive fuel and facing the largest marginal abatement incentive under carbon pricing. Gas-dominant facilities show moderate responses ($\beta = -0.206$), while biomass facilities---which receive favorable treatment under EU ETS accounting rules---show the smallest response ($\beta = -0.105$). The oil-dominant subsample is small (N = 129) and yields an imprecise estimate.
+
+\textbf{Country heterogeneity.} Spain exhibits the strongest estimated effect ($\beta = -1.254$), though this is based on only 125 observations. Among larger country samples, Poland ($\beta = -0.327$) and France ($\beta = -0.250$) show stronger responses than Sweden ($\beta = -0.109$). This variation likely reflects differences in fuel mix composition, regulatory enforcement intensity, and the marginal cost of abatement across national electricity systems.
+
+\subsubsection{Split-Sample Results: Satellite NOx}
+
+Table~\ref{tab:het_nox} reports split-sample estimates for satellite NOx at the conservative detection limit (DL $\geq$ 0.11 kg/s), where the main effect is significant.
+
+\begin{table}[h]
+\caption{Heterogeneity in Satellite NOx Treatment Effects (DL $\geq$ 0.11 kg/s, PLS)}\label{tab:het_nox}%
+\begin{tabular*}{\textwidth}{@{\extracolsep\fill}llcccc}
+\toprule
+Dimension & Group & Coefficient & SE & $p$-value & N \\
+\midrule
+\textit{Sector} & Electricity & $-$0.0032*** & 0.0003 & 0.002 & 132 \\
+\midrule
+\textit{Location} & Urban & 0.0070** & 0.0021 & 0.045 & 128 \\
+\midrule
+\textit{Fuel} & Gas & $-$0.0033 & 0.0215 & 0.902 & 68 \\
+& Coal & 0.0507*** & 0.0001 & 0.001 & 38 \\
+\midrule
+\textit{Country} & France & $-$0.0036*** & 0.0000 & 0.008 & 96 \\
+& Poland & 0.0785** & 0.0025 & 0.021 & 44 \\
+\botrule
+\end{tabular*}
+\footnotetext{Note: Each row reports a separate regression on the indicated subsample using PLS embedding reduction. Sample restricted to observations above the conservative detection limit (0.11 kg/s). All specifications include Facility + Region$\times$Year FE. Small sample sizes in some subgroups limit precision. * $p<0.10$, ** $p<0.05$, *** $p<0.01$.}
+\end{table}
+
+The satellite NOx heterogeneity results show different patterns than CO$_2$:
+
+\textbf{Electricity sector.} The electricity-only subsample yields a significant negative effect ($\beta = -0.0032$, $p = 0.002$), confirming that the main effect is driven by power plants. The small sample of non-electricity facilities above detection limit precludes meaningful comparison.
+
+\textbf{Location.} Urban facilities show a \textit{positive} coefficient (0.0070, $p = 0.045$), contrasting with the negative main effect. This counterintuitive pattern may reflect measurement challenges: urban facilities operate in high-background NO$_2$ environments where the Beirle flux-divergence method has reduced signal-to-noise. Rural facilities, where available (N = 12), show the expected negative pattern but sample sizes are too small for reliable inference.
+
+\textbf{Fuel type.} The coal-dominant subsample (N = 38) yields a large positive coefficient (0.0507, $p = 0.001$), opposite to the expected direction. This anomaly likely reflects the small sample size and potential compositional effects: facilities that are both coal-dominant and above the NOx detection limit may be a selected group with distinct characteristics. Gas-dominant facilities show a non-significant negative coefficient.
+
+\textbf{Country.} France shows a significant negative effect ($\beta = -0.0036$, $p = 0.008$), while Poland shows a significant positive effect ($\beta = 0.0785$, $p = 0.021$). The divergent patterns across countries suggest that national-level confounders---regulatory enforcement, reporting practices, or systematic differences in facility types---may contaminate the satellite-based estimates.
+
+The heterogeneity results for satellite NOx should be interpreted cautiously given the small sample sizes and evidence of measurement challenges in certain subgroups.
+
+\subsubsection{PyPSA-Eur Cluster Analysis (Electricity Sector)}
+
+For electricity-sector facilities, I additionally examine heterogeneity across PyPSA-Eur power system clusters. Table~\ref{tab:pypsa} reports results for the five largest clusters by facility count.
+
+\begin{table}[h]
+\caption{Heterogeneity by PyPSA-Eur Power System Cluster (Electricity Sector)}\label{tab:pypsa}%
+\begin{tabular*}{\textwidth}{@{\extracolsep\fill}lcccc}
+\toprule
+Cluster & ETS CO$_2$ & NOx (PLS, DL$\geq$0.11) & N (CO$_2$) & N (NOx) \\
+\midrule
+PL0 2 (Poland) & $-$1.456*** & 0.036 & 228 & 34 \\
+FR0 9 (France) & $-$0.246** & $-$0.004 & 212 & 82 \\
+PL0 1 (Poland) & $-$0.380* & --- & 148 & 9 \\
+PL0 0 (Poland) & $-$1.090*** & --- & 122 & --- \\
+AT0 0 (Austria) & $-$0.262** & --- & 129 & 29 \\
+\botrule
+\end{tabular*}
+\footnotetext{Note: PyPSA-Eur clusters are k-means clusters on transmission network topology. Polish clusters (PL0 0, PL0 1, PL0 2) show the strongest CO$_2$ responses. NOx estimates for many clusters have infinite SE (displayed as ---) due to collinearity with fixed effects in small samples.}
+\end{table}
+
+Polish network clusters consistently exhibit the strongest CO$_2$ responses, with PL0 2 ($\beta = -1.456$) and PL0 0 ($\beta = -1.090$) showing effects 5--7 times larger than the pooled estimate. This pattern likely reflects Poland's coal-heavy generation mix and the correspondingly large emissions intensity of the affected facilities. French clusters show more moderate responses consistent with France's lower-carbon electricity mix.
+
+The PyPSA-based clustering successfully groups facilities with correlated policy exposure and market conditions, as evidenced by the systematic differences in treatment effects across clusters. This supports the use of network-derived clusters for heterogeneity analysis in electricity sector studies.
+
+\subsubsection{Continuous Interaction Models}
+
+Table~\ref{tab:interactions} reports results from models that interact the allocation ratio with continuous facility characteristics, enabling tests of whether treatment effects vary with facility attributes.
+
+\begin{table}[h]
+\caption{Treatment Effect Interactions: ETS CO$_2$}\label{tab:interactions}%
+\begin{tabular*}{\textwidth}{@{\extracolsep\fill}lccc}
+\toprule
+Variable & Coefficient & SE & $p$-value \\
+\midrule
+Treatment (baseline) & $-$0.046 & 0.113 & 0.689 \\
+$\times$ Fuel: coal & $-$0.631*** & 0.238 & 0.010 \\
+$\times$ Fuel: gas & $-$0.234* & 0.118 & 0.051 \\
+$\times$ Fuel: oil & $-$0.481*** & 0.170 & 0.006 \\
+$\times$ Fuel: biomass & $-$0.122 & 0.111 & 0.275 \\
+$\times$ Capacity (std) & 0.015 & 0.050 & 0.761 \\
+$\times$ Urban & 0.071** & 0.032 & 0.032 \\
+\botrule
+\end{tabular*}
+\footnotetext{Note: Interaction model with allocation ratio interacted with fuel shares (continuous, summing to 1), standardized capacity, and urban indicator. Baseline treatment effect represents hypothetical facility with zero fuel shares, zero capacity, and rural location. * $p<0.10$, ** $p<0.05$, *** $p<0.01$.}
+\end{table}
+
+\textbf{Fuel composition.} The interaction model confirms that treatment effects are strongest for
+facilities using carbon-intensive fuels. The coal interaction ($-$0.631, $p = 0.010$) indicates that
+a facility with 100\% coal share would experience a treatment effect of approximately $-0.046 -
+0.631 = -0.68$, compared to $-0.046 - 0.234 = -0.28$ for a 100\% gas facility. The biomass
+interaction is small and not statistically significant, consistent with biomass receiving
+preferential treatment under EU ETS carbon accounting \cite{ellerman2016}.
+
+\textbf{Capacity.} The capacity interaction is small and not significant (0.015, $p = 0.761$), indicating that treatment effects do not systematically vary with facility size after controlling for fuel composition.
+
+\textbf{Urbanization.} The urban interaction is positive and significant (0.071, $p = 0.032$), indicating that urban facilities exhibit smaller emission reductions than rural facilities for a given change in allocation ratio. At mean urbanization (60\% urban), this implies an attenuation of approximately 0.04 units relative to a fully rural facility.
+
+For satellite NOx at the permissive detection limit (DL $\geq$ 0.03), the interaction model reveals significant effects for capacity and urbanization:
 \begin{itemize}
-    \item Sensitivity to NOx detection limit (conservative 0.11 kg/s vs permissive 0.03 kg/s)
-    \item Embedding reduction method (PCA vs PLS)
-    \item Split-sample heterogeneity analysis by:
-    \begin{itemize}
-        \item Electricity sector (activity codes 1, 20) vs other sectors
-        \item Urbanization (urban vs rural facilities)
-        \item Dominant fuel type (coal, gas, oil, biomass)
-        \item Country (top 5 by facility count)
-        \item PyPSA-Eur grid clusters (electricity sector only, top 5 by facility count)
-    \end{itemize}
-    \item Continuous interaction terms to test whether treatment effects vary with:
-    \begin{itemize}
-        \item Fuel composition (treatment $\times$ share\_coal, treatment $\times$ share\_gas, etc.)
-        \item Facility capacity (treatment $\times$ capacity, standardized)
-        \item Urbanization (treatment $\times$ urban, binary)
-    \end{itemize}
+    \item Capacity interaction: $-$0.0014*** (SE = 0.0003, $p < 0.001$), indicating that larger facilities show stronger NOx reductions per unit change in allocation ratio
+    \item Urban interaction: 0.0045*** (SE = 0.0011, $p < 0.001$), indicating that urban facilities show weaker (or reversed) NOx effects
 \end{itemize}
+
+These patterns are consistent across PCA and PLS specifications, providing evidence that while the main NOx effect is not significant at the permissive detection limit, there is meaningful heterogeneity in treatment effects by facility characteristics.
+
+\subsection{Robustness Summary}\label{sec:results:robustness}
+
+The results exhibit several patterns supporting robustness:
+
+\textbf{Cross-outcome consistency.} Both ETS CO$_2$ and satellite NOx (at the conservative detection limit) show negative treatment effects, consistent with the hypothesis that reduced allocation ratios induce emission reductions. The sign consistency across independent measurement systems---administrative reporting versus satellite remote sensing---provides mutual validation.
+
+\textbf{Embedding method stability.} NOx estimates at DL $\geq$ 0.11 are nearly identical across PCA ($-$0.00282) and PLS ($-$0.00301) specifications, differing by only 7\%. This stability suggests that results are not sensitive to the specific dimensionality reduction approach and mitigates concerns about regularization bias from the supervised PLS method.
+
+\textbf{Detection limit sensitivity.} The sharp contrast between null results at DL $\geq$ 0.03 and significant results at DL $\geq$ 0.11 is consistent with the measurement properties of the Beirle flux-divergence method: at permissive thresholds, noise dominates signal for most observations. The emergence of significant effects at the conservative threshold, where satellite estimates are more reliable, suggests that the null results at permissive thresholds reflect measurement error attenuation rather than absence of a true effect.
+
+\textbf{Heterogeneity patterns.} The stronger CO$_2$ effects for coal-dominant facilities, electricity-sector facilities, and rural facilities are theoretically plausible and consistent with the structure of EU ETS incentives. Some NOx heterogeneity patterns are anomalous (positive urban and coal coefficients), likely reflecting measurement challenges in those subgroups.
 
 %% ========================================================================
 %% DISCUSSION
 %% ========================================================================
 \section{Discussion}\label{sec:discussion}
 
-\textit{[Discussion to be completed with empirical results.]}
+This study develops and applies a methodological framework for evaluating climate policy impacts using dual outcomes: verified EU ETS CO$_2$ emissions and satellite-derived NOx emission proxies. The empirical results reveal a robust negative relationship between allocation ratios and verified CO$_2$ emissions, with consistent but noisier effects for satellite-derived NOx that emerge only at conservative detection thresholds. Several aspects of these findings merit discussion.
 
-This study develops a methodological framework for evaluating climate policy impacts using dual outcomes: verified EU ETS CO$_2$ emissions and satellite-derived NOx emission proxies. This approach enables comprehensive assessment of both greenhouse gas reductions and air quality co-benefits. Several aspects merit discussion.
+\subsection{Summary of Empirical Findings}
 
+The main empirical finding is that EU ETS policy stringency---measured by the allocation ratio---has a robust negative effect on verified CO$_2$ emissions. The estimated coefficient of $-$0.186 ($p < 0.001$) implies that a 10\% shortfall position (allocation ratio = 0.9) is associated with approximately 1.9\% lower verified emissions compared to full free allocation. This effect is economically meaningful: at the sample mean of 580 ktCO$_2$/yr, it corresponds to 11 ktCO$_2$ per 0.1 unit decrease in allocation ratio.
+
+The satellite-derived NOx proxy provides supporting evidence at the conservative detection limit (DL $\geq$ 0.11 kg/s), with estimated effects of $-$0.003 kg/s per unit allocation ratio ($p = 0.001$--0.017). This represents approximately 1.7\% reduction in NOx emissions per 10\% shortfall, broadly consistent with the CO$_2$ finding. However, at the permissive detection limit (DL $\geq$ 0.03 kg/s), the NOx effect is statistically indistinguishable from zero, highlighting the importance of detection limit thresholds in satellite-based emission studies.
+
+Heterogeneity analysis reveals that treatment effects are strongest for coal-dominant facilities
+($\beta = -0.98$ for CO$_2$), electricity-sector facilities ($\beta = -0.21$), and rural facilities
+($\beta = -0.24$). These patterns are consistent with the structure of EU ETS incentives: coal faces
+the highest carbon intensity and hence the largest marginal abatement incentive, while electricity
+generators have largely lost free allocation under Phase III/IV \cite{ellerman2016}.
+ 
 \subsection{Interpretation of Estimates}
 
-The allocation ratio treatment variable has a natural interpretation in terms of policy stringency. A coefficient estimate of $\beta$ on $R_{it}$ implies that a 0.1 unit decrease in the allocation ratio (from 1.0 to 0.9, representing a shift from full free allocation to 10\% shortfall) is associated with a $-0.1\beta$ change in the outcome variable.
+The allocation ratio treatment variable has a natural interpretation in terms of policy stringency. The coefficient of $-$0.186 on log-transformed verified CO$_2$ emissions implies that each 0.1 unit decrease in the allocation ratio is associated with approximately 1.9\% lower emissions (since $\exp(-0.186 \times 0.1) - 1 \approx -0.018$). The effect is identified from within-facility variation in allocation ratios over time, after controlling for region-year fixed effects.
 
-\textbf{For verified CO$_2$}: The outcome is directly measured and reported under EU ETS compliance, providing high-quality estimates of policy effects on greenhouse gas emissions.
+\textbf{For verified CO$_2$}: The estimate of $-$0.186 is precisely estimated (SE = 0.030) and highly significant ($p < 0.001$). The 95\% confidence interval [$-$0.246, $-$0.127] excludes zero and implies emission reductions of 1.3--2.5\% per 0.1 unit shortfall. This estimate is conservative in the sense that any remaining endogeneity from dispatch variation would likely attenuate the coefficient toward zero.
 
-\textbf{For satellite-derived NOx}: The Beirle-style flux-divergence approach provides a metric that is physically grounded in the continuity equation, with advection proportional to local emissions minus chemical sinks. Unlike simple column density comparisons, this method isolates facility-attributable emissions from regional background. However, interpretation requires caution due to the substantial uncertainty components discussed in Section~\ref{sec:data:beirle}.
+\textbf{For satellite-derived NOx}: The estimates at the conservative detection limit ($-$0.00282 for PCA, $-$0.00301 for PLS) are significant at conventional levels ($p = 0.017$ and $p = 0.001$, respectively). The magnitude implies 0.3 g/s lower NOx per 0.1 unit decrease in allocation ratio. At the sample mean of 0.18 kg/s for above-threshold observations, this represents a 1.7\% reduction---remarkably close to the 1.9\% CO$_2$ reduction. However, the confidence intervals are wide due to small sample size (N = 140).
 
-\textbf{Cross-validation}: Agreement in sign and broad magnitude between CO$_2$ and NOx responses provides confidence that both outcomes are capturing genuine policy effects. Perfect correspondence is not expected---NOx and CO$_2$ have different emission factors by fuel type and combustion conditions---but directional agreement supports the validity of both measures.
+\textbf{Cross-validation}: The directional agreement between CO$_2$ and NOx estimates at the conservative detection limit supports the hypothesis that both outcomes are capturing genuine policy effects. The similar percentage magnitudes (1.9\% vs. 1.7\%) suggest that carbon pricing operates primarily through reduced combustion intensity rather than through emission factor changes (e.g., end-of-pipe controls). This pattern is consistent with the dominant mechanism being reduced output or fuel switching rather than pollution control investments.
 
-\subsection{Identification Concerns}
-
-Several potential threats to identification remain. First, \textbf{operational confounding}: facilities may respond to high carbon prices by adjusting operations (reducing output, switching fuels) in ways that are not fully captured by the control variables. To the extent that these operational responses are the mechanism through which carbon pricing affects air quality, this is not problematic---it is the causal effect of interest. However, if operational changes are driven by other factors correlated with allocation ratios (e.g., electricity prices), bias may result.
-
-Second, \textbf{measurement error in satellite NOx}: The Beirle-style flux-divergence approach is subject to multiple uncertainty sources (Section~\ref{sec:data:beirle}): lifetime parameterization (50\% relative uncertainty), product differences between OFFL and PAL ($\pm$25\%), NOx/NO$_2$ scaling ($\sim$7\%), and spatial integration noise. These compound to total uncertainties of 20--40\% per facility-year, with potential systematic low bias of $\sim$20\% relative to reported emissions. This measurement error attenuates treatment effect estimates toward zero, making the satellite-based findings conservative.
-
-Third, \textbf{spillovers}: if carbon pricing induces substitution across facilities (e.g., shifting generation from high-cost to low-cost plants), the stable unit treatment value assumption (SUTVA) may be violated. The region$\times$year fixed effects specification partially addresses this by absorbing regional substitution patterns.
-
-\subsection{Limitations of the Satellite NOx Proxy}
-
-The satellite-derived NOx estimates should be interpreted with several limitations in mind:
-\begin{itemize}
-    \item \textbf{Use of OFFL L3 instead of PAL}: Beirle et al. (2023) use the PAL NO$_2$ product, which provides 10--40\% higher TVCDs. The OFFL L3 product available via Google Earth Engine introduces additional uncertainty.
-    \item \textbf{Simplified NOx/NO$_2$ scaling}: The photostationary-state approximation may not hold near stack plumes; I apply a fixed ratio of 1.38 $\pm$ 0.10 following Beirle et al. (approximately 7\% uncertainty).
-    \item \textbf{Integration radius trade-off}: The 15 km radius balances capturing the full point source signal against spatial interference from neighboring sources. For facilities in dense industrial areas, some signal contamination is likely.
-    \item \textbf{Spatial interference}: For facilities with another ETS facility within 20~km (flagged via \texttt{interfered\_20km}), the satellite outcome reflects emissions of the \textit{local cluster} rather than an isolated point source. Treatment effect estimates for these facilities should be interpreted as cluster-level responses. Sensitivity analyses excluding interfered facilities test whether results are robust to this contamination.
-    \item \textbf{Detection limit}: Beirle et al. Sect. 3.11.1 report detection limits of 0.11 kg/s (standard conditions) down to 0.03 kg/s (ideal high-albedo conditions). Since we do not implement a surface reflectivity mask, we flag observations against both thresholds and present sensitivity analysis using the conservative 0.11 kg/s threshold for Europe.
-    \item \textbf{Skipping automatic identification}: We skip Beirle's automatic point-source identification algorithm because we have known ETS/LCP source locations. This design choice is explicitly endorsed by the authors and is conceptually appropriate for our use case, but it means we do not benefit from their classification step that filters artifacts and non-point sources. To compensate, we apply simplified significance filters (detection limit, statistical integration error, interference flag).
-    \item \textbf{Unmodeled corrections}: AMF correction and plume height effects following Beirle et al. (2023) are not fully implemented, contributing to structural uncertainty. Topographic correction is implemented using SRTM elevation data.
-    \item \textbf{Temporal averaging approach}: Beirle et al. compute temporal means of A* at orbit resolution before applying a single lifetime correction using mean wind speed. I instead aggregate to daily resolution and apply the lifetime correction per-day before temporal averaging, i.e., $E = \text{mean}[c_\tau(w_d) \times A^*_d]$ rather than $c_\tau(\bar{w}) \times \text{mean}(A^*)$. Since $c_\tau$ is nonlinear in wind speed, these are not mathematically identical; however, the difference is small for typical wind speed variance and the per-day approach is more appropriate for constructing annual panel estimates rather than a single multi-year catalog value.
-\end{itemize}
-
-These design choices---using OFFL instead of PAL, simplified significance flags, skipping the automatic identification algorithm---primarily increase noise and potential attenuation bias, not spurious detection. The satellite outcome remains a \textit{physically grounded but noisy proxy}; ETS verified CO$_2$ remains the primary outcome for causal inference.
+The null results at the permissive detection limit illustrate the importance of signal-to-noise considerations in satellite-based emission studies. At DL $\geq$ 0.03 kg/s, the sample mean (0.065 kg/s) is below the standard detection threshold, meaning most observations are dominated by measurement noise. Classical measurement error attenuates treatment effects toward zero, explaining the null findings. This pattern---significant effects emerging only above detection thresholds---is precisely what physical measurement theory would predict.
 
 \subsection{Methodological Contributions: ML-Derived Features in Causal Inference}
 
@@ -1007,27 +1139,64 @@ This study contributes to a growing literature on incorporating machine learning
 
 \textbf{Geospatial foundation model embeddings as controls.} The use of AlphaEarth embeddings \cite{alphaearth2025} demonstrates that pre-trained geospatial representations can serve as effective high-dimensional controls in panel settings. Unlike manually-specified geographic controls (distance to coast, elevation, population density), foundation model embeddings capture complex, nonlinear combinations of features that the model learned to be predictive across diverse tasks. The key assumption---that these embeddings capture confounders affecting both policy exposure and air quality outcomes---is plausible given that the embeddings encode land use, infrastructure, and climate patterns that likely correlate with both industrial activity and pollution dispersion. Future work should investigate the sensitivity of causal estimates to different embedding specifications and the conditions under which learned representations provide valid confounding adjustment.
 
-\textbf{Network-based clustering from external models.} The use of PyPSA-Eur power system clusters for both fixed effects and inference represents a novel application of model-derived features for econometric analysis. Traditional approaches to clustered standard errors use geographic proximity or administrative boundaries that may not reflect the economically-relevant correlation structure. By using clusters derived from transmission network topology \cite{horsch2018}, which minimize within-cluster electrical distance, I define regions where facilities face correlated prices, dispatch patterns, and demand shocks---precisely the correlations that motivate cluster-robust inference \cite{kojevnikov2023}. This approach could be extended to other networked industries where external models of the network structure are available.
+\textbf{Network-based clustering from external models.} The use of PyPSA-Eur power system clusters
+for heterogeneity analysis represents a novel application of model-derived features for econometric
+analysis. As my panel included non-Electricity plants, and I was already limited due to sample
+attrition in statistical power, these were not included directly as fixed-effects, deferring to
+NUTS-2 regions. Traditional approaches to clustered standard errors use geographic proximity or
+administrative boundaries that may not reflect the economically-relevant correlation structure. By
+using clusters derived from transmission network topology \cite{horsch2018}, which minimize
+within-cluster electrical distance, I define regions where facilities face correlated prices,
+dispatch patterns, and demand shocks---precisely the correlations that motivate cluster-robust
+inference \cite{kojevnikov2023}. This approach could be extended to other networked industries where
+external models of the network structure are available.
 
 \subsection{Limitations and Future Work}
 
-\textbf{Sample attrition.}
-The requirement for valid linkage across three independent data sources (LCP registry, EU Registry crosswalk, EUTL compliance data) reduces the initial universe of 3,405 LCP plants to 521 facilities (15.3\% retention). The satellite NOx outcome will have additional attrition from detection limits and observation coverage requirements. This attrition reduces statistical power and may introduce selection bias if the matched sample differs systematically from the broader LCP population. The 500m spatial clustering threshold, while appropriate for grouping co-located emission sources into coherent facilities, may occasionally merge distinct plants or fail to group plants that share a common plume.
+\subsubsection{Identification Concerns}
 
-\textbf{Size threshold and generalizability.}
-The sample is restricted to large facilities with sufficient emissions for satellite detection (0.11 kg/s NOx conservative threshold), limiting generalizability to smaller sources. The annual temporal resolution may miss short-run dynamics such as seasonal fuel switching or within-year operational adjustments.
+Several potential threats to identification remain.
 
-\textbf{Satellite measurement uncertainty.}
-The satellite NOx proxy is subject to the multiple uncertainty components detailed in Section~\ref{sec:data:beirle}, though these primarily introduce classical measurement error that attenuates rather than biases estimates.
+\textbf{Operational confounding.} Facilities may respond to high carbon prices by adjusting operations in ways not fully captured by the control variables, such as investing in pollutant abatement technologies. To the extent that these operational responses are the mechanism through which carbon pricing affects air quality, this is not problematic---it is the causal effect of interest. However, if operational changes are driven by other factors correlated with allocation ratios (e.g., electricity prices), bias may result.
 
-\textbf{Heterogeneous satellite observation coverage.}
-Different facilities have different numbers of valid observation days per year (typically 60--80 out of $\sim$180 days with TROPOMI coverage) due to cloud cover, wind speed filtering ($\geq$2 m/s requirement), and satellite orbit patterns. This heterogeneity raises a potential methodological concern: if the subset of observable days differs systematically across facilities---e.g., coastal plants observed more frequently in winter, inland plants more in summer---then annual mean emission rates may not be directly comparable across locations. For panel regressions, this concern is mitigated if: (i) observation selection is driven by weather, which is exogenous to treatment; (ii) the selection mechanism is stable within-facility over time, so facility fixed effects absorb level differences; and (iii) year fixed effects absorb common temporal patterns. As a robustness check, I include the number of valid observation days (\texttt{n\_days\_satellite}) as a control variable; stability of treatment effect estimates with and without this control supports the assumption that observation heterogeneity does not induce substantial bias.
+\textbf{Spillovers.} If carbon pricing induces substitution across facilities (e.g., shifting generation from high-cost to low-cost plants), the stable unit treatment value assumption (SUTVA) may be violated. The region$\times$year fixed effects specification partially addresses this by absorbing regional substitution patterns. Future work can include power system observables from \texttt{PyPSA-EUR} to account for this.
 
-\textbf{UK exclusion.}
-The EU ETS registry data used in this study does not include installations in the United Kingdom following Brexit. The UK withdrew from the EU ETS on January 1, 2021, and established its own UK Emissions Trading Scheme \cite{ukgov2024ukets}. Consequently, UK large combustion plants---which represented a significant share of EU ETS-regulated capacity prior to 2021---are excluded from the analysis panel. Future work extending this framework to include UK facilities would require obtaining compliance data from the UK ETS registry and harmonizing it with the EU data sources used here. This may be facilitated in the near future by the linking of the UK and EU's ETS systems.
+\subsubsection{Satellite NOx Proxy Limitations}
 
-\textbf{Event-study analysis.}
-The Callaway-Sant'Anna \cite{callaway2021} estimator would provide a valuable robustness check through event-study plots and formal pre-trend tests. However, as discussed in Section~\ref{sec:methods:csdid}, this approach is infeasible with the current panel (2018--2023) because 84.5\% of ever-treated facilities were already treated in the first panel year. Extending the panel backward to include EU ETS Phase 3 (2013--2017) would capture the actual first-treatment timing for most facilities, enabling event-study analysis with proper pre-treatment observations. This represents a natural extension for future work.
+The satellite-derived NOx estimates should be interpreted with several limitations in mind:
+\begin{itemize}
+    \item \textbf{Use of OFFL L3 instead of PAL}: Beirle et al. (2023) use the PAL NO$_2$ product, which provides 10--40\% higher TVCDs. The OFFL L3 product available via Google Earth Engine introduces additional uncertainty.
+    \item \textbf{Simplified NOx/NO$_2$ scaling}: The photostationary-state approximation may not hold near stack plumes; I apply a fixed ratio of 1.38 $\pm$ 0.10 following Beirle et al. (approximately 7\% uncertainty).
+    \item \textbf{Integration radius trade-off}: The 15 km radius balances capturing the full point-source signal against spatial interference from neighboring sources. For facilities in dense industrial areas, some signal contamination is likely.
+    \item \textbf{Spatial interference}: For facilities with another ETS facility within 20~km (flagged via \texttt{interfered\_20km}), the satellite outcome reflects emissions of the \textit{local cluster} rather than an isolated point source. Treatment effect estimates for these facilities should be interpreted as cluster-level responses.
+    \item \textbf{Detection limit}: Beirle et al. Sect. 3.11.1 report detection limits of 0.11 kg/s (standard) to 0.03 kg/s (ideal conditions). I flag observations against both thresholds and present sensitivity analysis using the conservative 0.11 kg/s threshold for Europe.
+    \item \textbf{Skipping automatic identification}: I skip Beirle's automatic point-source identification algorithm because I have known ETS/LCP source locations. This design choice is explicitly endorsed by the authors, but it means I do not benefit from their classification step that filters artifacts and non-point sources. To compensate, I apply simplified significance filters.
+    \item \textbf{Unmodeled corrections}: AMF correction and plume height effects are not fully implemented, contributing to structural uncertainty. Topographic correction is implemented using SRTM elevation data.
+    \item \textbf{Temporal averaging}: Beirle et al. compute temporal means of $A^*$ before applying a single lifetime correction. I instead apply the lifetime correction per-day before averaging, i.e., $E = \text{mean}[c_\tau(w_d) \times A^*_d]$. The difference is small for typical wind speed variance.
+\end{itemize}
+
+These design choices primarily increase noise and potential attenuation bias, not spurious detection. The satellite outcome remains a \textit{physically grounded but noisy proxy}; ETS verified CO$_2$ remains the primary outcome for causal inference.
+
+\subsubsection{Data Limitations}
+
+\textbf{Sample attrition.} The requirement for valid linkage across three independent data sources (LCP registry, EU Registry crosswalk, EUTL compliance data) reduces the initial universe of 3,405 LCP plants to 521 facilities (15.3\% retention). The satellite NOx outcome has additional attrition from detection limits and observation coverage requirements. This attrition reduces statistical power and may introduce selection bias if the matched sample differs systematically from the broader LCP population.
+
+\textbf{Generalizability.} The sample is restricted to large facilities (LCPs), with sufficient
+emissions for satellite detection (0.11 kg/s NOx conservative threshold) in the case of the NOx outcome, limiting generalizability
+to smaller sources. The annual temporal resolution may miss short-run dynamics such as seasonal fuel
+switching or within-year operational adjustments.
+
+\textbf{Heterogeneous satellite observation coverage.} Different facilities have different numbers of valid observation days per year (typically 60--80 out of $\sim$180 days with TROPOMI coverage) due to cloud cover, wind speed filtering ($\geq$2 m/s requirement), and satellite orbit patterns. For panel regressions, this concern is mitigated if: (i) observation selection is driven by weather, which is exogenous to treatment; (ii) the selection mechanism is stable within-facility over time; and (iii) year fixed effects absorb common temporal patterns.
+
+\textbf{UK exclusion.} The EU ETS registry data does not include UK installations following Brexit. UK large combustion plants---which represented a significant share of EU ETS-regulated capacity prior to 2021---are excluded. Future work could extend this framework to include UK facilities by obtaining compliance data from the UK ETS registry \cite{ukgov2024ukets}.
+
+\subsubsection{Future Work}
+
+\textbf{Event-study analysis.} The Callaway-Sant'Anna \cite{callaway2021} estimator would provide a valuable robustness check through event-study plots and formal pre-trend tests. However, as discussed in Section~\ref{sec:methods:csdid}, this approach is infeasible with the current panel (2018--2023) because 84.5\% of ever-treated facilities were already treated in the first panel year. Extending the panel backward to include EU ETS Phase 3 (2013--2017) would enable event-study analysis with proper pre-treatment observations.
+
+\textbf{Power system integration.} Incorporating dispatch and generation data from \texttt{PyPSA-EUR} would enable direct control for facility-level utilization, addressing the bad-controls trade-off discussed in Section~\ref{sec:methods:identification}.
+
+\textbf{Extension to other pollutants.} The dual-outcome framework could be extended to methane point sources using TROPOMI CH$_4$, enabling comprehensive evaluation of climate and air quality co-benefits.
 
 %% ========================================================================
 %% CONCLUSION
@@ -1040,11 +1209,23 @@ The study makes three methodological contributions, two of which follow a recent
 
 \textbf{First}, I demonstrate the integration of geospatial foundation model embeddings as high-dimensional controls in panel-based climate monitoring studies. Using Google AlphaEarth \cite{alphaearth2025}---64-dimensional representations learned from multi-source satellite imagery, climate reanalysis, and geotagged text---I capture between-unit heterogeneity arising from local geographic, infrastructural, and climate context in a data-efficient manner. This extends prior work on learned embeddings for causal inference \cite{veitch2019} from text to the geospatial domain, and is particularly relevant for difference-in-differences settings where high-dimensional spatial confounders may violate parallel trends if left uncontrolled \cite{zimmert2018}.
 
-\textbf{Second}, I introduce network-based clustering derived from an external power system model for econometric inference. Standard errors are clustered using PyPSA-Eur power system clusters \cite{horsch2018}---k-means clusters computed on transmission network topology features---that group facilities facing correlated wholesale prices, dispatch patterns, and grid constraints. This approach is grounded in recent theoretical foundations showing that valid cluster-robust inference requires low-conductance clusters \cite{kojevnikov2023}, which network-derived clusters satisfy by construction. To my knowledge, this represents the first application of model-derived clustering---where clusters are computed on features from an external domain-specific model rather than on the outcome data itself---for econometric inference in policy evaluation.
+\textbf{Second}, I introduce network-based clustering derived from an external power system model
+for econometric inference. Due to limitations introduced by sample attrition and the drawback of
+limiting further to only electricity plants, I did not use these in this study to cluster standard
+errors or as a fixed effect. Instead, I use the \texttt{PyPSA-Eur} power system clusters for
+heteregeneity analysis. These are k-means clusters computed on transmission network topology features---that group
+facilities facing correlated wholesale prices, dispatch patterns, and grid constraints \cite{horsch2018}. This
+approach is grounded in recent theoretical foundations showing that valid cluster-robust inference
+requires low-conductance clusters \cite{kojevnikov2023}, which network-derived clusters satisfy by
+construction. To my knowledge, this represents the first application of model-derived
+clustering---where clusters are computed on features from an external domain-specific model rather
+than on the outcome data itself---for econometric inference in policy evaluation.
 
 \textbf{Third}, for the satellite outcome, I implement a simplified Beirle-style flux-divergence method that provides physically grounded NOx emission estimates at the facility level. By computing the advection---the wind-aligned spatial derivative of NO$_2$ column density---and integrating over a 15 km disc with lifetime correction, this approach provides facility-specific NOx estimates suitable for panel econometric analysis. This methodology is grounded in the continuity equation and follows the approach of Beirle et al. (2019, 2021, 2023) \cite{beirle2019,beirle2021,beirle2023}, which has been validated against reported emissions from regulatory agencies.
 
-[Substantive empirical conclusions to be added with results.]
+\textbf{Empirical findings.} Applying this framework to 521 EU ETS-regulated large combustion plants across 82 NUTS2 regions (2018--2023), I find that carbon market stringency has a robust negative effect on verified CO$_2$ emissions. A 10\% allocation shortfall (allocation ratio = 0.9 vs. 1.0) is associated with approximately 1.9\% lower verified emissions ($\beta = -0.186$, $p < 0.001$). This effect is concentrated among coal-dominant facilities ($\beta = -0.98$) and electricity generators ($\beta = -0.21$), consistent with the structure of EU ETS incentives.
+
+The satellite-derived NOx proxy provides supporting evidence at the conservative detection limit: facilities above 0.11 kg/s NOx show significant negative effects of similar magnitude ($\beta \approx -0.003$, 1.7\% per 10\% shortfall, $p < 0.01$). The directional agreement between administrative CO$_2$ and satellite NOx---outcomes measured through entirely independent systems---strengthens confidence that both are capturing genuine policy effects. However, the null results at permissive detection limits highlight the continued importance of signal-to-noise considerations in satellite-based emission monitoring.
 
 The broader contribution of this work is demonstrating that combining administrative emissions records with satellite-derived proxies, along with ML-derived controls and network-informed inference, can provide comprehensive evaluation of climate policy impacts at the individual emitter level. The dual-outcome approach offers several advantages: (i) verified CO$_2$ provides the gold standard for measuring policy effects on greenhouse gas output; (ii) satellite-derived NOx provides an independent check on combustion activity and enables testing co-benefit hypotheses; and (iii) agreement between outcomes provides cross-validation that both measures are capturing genuine policy effects.
 
@@ -1058,9 +1239,9 @@ As satellite instruments improve in resolution and retrieval accuracy, and as me
 
 \begin{itemize}
 \item \textbf{Data availability}: EEA Large Combustion Plant data available from the European Environment Agency Industrial Emissions Portal. EU ETS data available from the European Union Transaction Log. TROPOMI data available via Google Earth Engine. ERA5-Land data available from the Copernicus Climate Data Store.
-\item \textbf{Code availability}: Full data processing and analysis code available at https://github.com/arnava13/Masters-Thesis
+\item \textbf{Code availability}: Full data processing and analysis code is available at https://github.com/arnava13/Masters-Thesis
 \item \textbf{Use of Generative AI}: Generative AI was used for programming, researching and writing
-this paper. Project direction was driven by me, and I manually audited \& corrected all code, sources, citations, equations and theoretical assertions.
+this paper. Project direction was driven by me, and I manually verified and refactored all code, sources, citations, equations and theoretical assertions.
 \end{itemize}
 
 \begin{appendices}
@@ -1102,7 +1283,9 @@ Raw LCP fuel types are mapped to standardized categories:
     \item \textbf{Other Gas}: OtherGases, OBG
 \end{itemize}
 
-Fuel types used by fewer than 10\% of facility-years (Other Solid, Peat) are dropped, shares renormalized, and facilities with no remaining fuel coverage are excluded from the sample.
+Fuel types used by fewer than 10\% of facility-years (Other Solid, Peat) are dropped, shares
+renormalized, and facilities with no remaining fuel coverage are excluded from the sample (although
+there were no such facilities).
 
 \section{Sample Attrition}\label{app:attrition}
 
@@ -1141,9 +1324,9 @@ Processing Step & Plants/Facilities & Lost & Retained \% \\
 \end{appendices}
 
 %%===========================================================================================%%
-%% If you are submitting to one of the Nature Portfolio journals, using the eJP submission   %%
+%% If you are submitting to one of the Nature Portfolio jmynals, using the eJP submission   %%
 %% system, please include the references within the manuscript file itself. You may do this  %%
-%% by copying the reference list from your .bbl file, paste it into the main manuscript .tex %%
+%% by copying the reference list from ymy .bbl file, paste it into the main manuscript .tex %%
 %% file, and delete the associated \verb+\bibliography+ commands.                            %%
 %%===========================================================================================%%
 
