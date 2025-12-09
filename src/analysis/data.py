@@ -32,9 +32,11 @@ DL_0_03_COL = "above_dl_0_03"
 DL_CONSERVATIVE_COL = DL_0_11_COL
 DL_PERMISSIVE_COL = DL_0_03_COL
 REL_ERR_STAT_LT_0_3_COL = "rel_err_stat_lt_0_3"
+N_DAYS_SATELLITE_COL = "n_days_satellite"
 INTERFERED_20KM_COL = "interfered_20km"
 URBANIZATION_DEGREE_COL = "urbanization_degree"
 IN_URBAN_AREA_COL = "in_urban_area"
+IS_ELECTRICITY_COL = "is_electricity"  # EU ETS activity codes 1 or 20 (combustion)
 
 
 # =============================================================================
@@ -109,9 +111,9 @@ def load_analysis_panel(
     yearly = load_facilities_yearly(yearly_path)
     
     # Merge static info into yearly panel
-    # Note: urbanization variables are for heterogeneity analysis, not regression controls
+    # Note: urbanization and interference variables are for heterogeneity analysis, not regression controls
     static_cols = [FAC_ID_COL, "lat", "lon", "country_code", 
-                   URBANIZATION_DEGREE_COL, IN_URBAN_AREA_COL]
+                   URBANIZATION_DEGREE_COL, IN_URBAN_AREA_COL, INTERFERED_20KM_COL]
     static_cols = [c for c in static_cols if c in static.columns]
     
     panel = yearly.merge(
@@ -125,14 +127,20 @@ def load_analysis_panel(
         # Add small offset to handle zeros
         panel[LOG_ETS_CO2_COL] = np.log(panel[ETS_CO2_COL] + 1)
     
-    # Merge satellite outcomes
+    # Merge satellite outcomes (includes AlphaEarth embeddings for NOx retrieval context)
+    # NOTE: Embeddings are stored in beirle_panel, NOT facilities_yearly, because they
+    # are controls for the satellite measurement process (terrain, land use, climate)
+    # and do NOT affect ETS CO₂ (administrative mass balance reporting).
     if include_satellite and beirle_path is not None:
         try:
             beirle = load_beirle_panel(beirle_path)
-            # Keep only key columns from Beirle panel
+            # Keep key columns from Beirle panel (including embeddings if present)
             beirle_cols = [FAC_ID_COL, YEAR_COL, NOX_OUTCOME_COL, NOX_SE_COL,
                           "rel_err_total", "rel_err_stat", "rel_err_tau",
-                          DL_CONSERVATIVE_COL, DL_PERMISSIVE_COL, "n_days_satellite"]
+                          DL_CONSERVATIVE_COL, DL_PERMISSIVE_COL, N_DAYS_SATELLITE_COL]
+            # Add embedding columns (emb_* pattern)
+            emb_cols = [c for c in beirle.columns if c.startswith("emb_")]
+            beirle_cols.extend(emb_cols)
             beirle_cols = [c for c in beirle_cols if c in beirle.columns]
             
             panel = panel.merge(
@@ -141,7 +149,10 @@ def load_analysis_panel(
                 how="left"
             )
             n_with_sat = panel[NOX_OUTCOME_COL].notna().sum()
+            n_with_emb = panel[emb_cols[0]].notna().sum() if emb_cols else 0
             print(f"Satellite outcomes: {n_with_sat} obs with valid NOx data")
+            if emb_cols:
+                print(f"AlphaEarth embeddings: {len(emb_cols)} dims, {n_with_emb} obs (NOx analysis only)")
         except FileNotFoundError:
             print("Warning: Beirle panel not found, satellite outcomes unavailable")
     
@@ -196,10 +207,10 @@ def build_treatment_variables(
         .groupby(id_col)[time_col]
         .min()
     )
-    df[cohort_col] = df[id_col].map(first_treated).fillna(0).astype(int)
+    df[cohort_col] = df[id_col].map(first_treated).fillna(0).astype(int) # type: ignore
     
     # Summary
-    n_ever = (df.groupby(id_col)[treated_col].max() > 0).sum()
+    n_ever = (df.groupby(id_col)[treated_col].max() > 0).sum() # type: ignore
     n_never = df[id_col].nunique() - n_ever
     print(f"Treatment: {n_ever} ever-treated, {n_never} never-treated")
     
@@ -249,8 +260,8 @@ def apply_ets_emissions_filter(
     n_before = len(df)
     
     # Find facilities with at least one year above threshold
-    facs_above = df[df[co2_col] >= min_co2_tco2][id_col].unique()
-    df = df[df[id_col].isin(facs_above)]
+    facs_above = df[df[co2_col] >= min_co2_tco2][id_col].unique() # type: ignore
+    df = df[df[id_col].isin(facs_above)] # type: ignore
     
     n_fac_after = df[id_col].nunique()
     n_after = len(df)
@@ -301,7 +312,7 @@ def apply_sample_filters(
     
     # Year range
     if year_range:
-        df = df[(df[time_col] >= year_range[0]) & (df[time_col] <= year_range[1])]
+        df = df[(df[time_col] >= year_range[0]) & (df[time_col] <= year_range[1])] # type: ignore
     
     # ETS emissions filter (only for ETS CO₂ analysis)
     if apply_ets_filter:
@@ -309,8 +320,8 @@ def apply_sample_filters(
     
     # Min years per facility
     years_per_fac = df.groupby(id_col)[time_col].nunique()
-    keep_facs = years_per_fac[years_per_fac >= min_years].index
-    df = df[df[id_col].isin(keep_facs)]
+    keep_facs = years_per_fac[years_per_fac >= min_years].index # type: ignore
+    df = df[df[id_col].isin(keep_facs)] # type: ignore
     
     # Require outcome
     if require_outcome and outcome_col:
@@ -370,16 +381,16 @@ def get_satellite_sample(
     if sample == "significant":
         # Detection limit: >= 0.11 kg/s (standard European conditions)
         if DL_0_11_COL in df.columns:
-            df = df[df[DL_0_11_COL] == True]
+            df = df[df[DL_0_11_COL] == True] # type: ignore
         # Statistical integration error < 30%
         if REL_ERR_STAT_LT_0_3_COL in df.columns:
-            df = df[df[REL_ERR_STAT_LT_0_3_COL] == True]
+            df = df[df[REL_ERR_STAT_LT_0_3_COL] == True] # type: ignore
     elif sample != "all":
         raise ValueError(f"Unknown sample: {sample}. Use 'all' or 'significant'.")
     
     # Optionally exclude interfered facilities
     if exclude_interfered and INTERFERED_20KM_COL in df.columns:
-        df = df[df[INTERFERED_20KM_COL] == False]
+        df = df[df[INTERFERED_20KM_COL] == False] # type: ignore
     
     n_after = len(df)
     n_fac = df[FAC_ID_COL].nunique() if FAC_ID_COL in df.columns else "?"
@@ -429,17 +440,17 @@ def apply_satellite_filters(
     # Detection limit filter (using new column names)
     dl_col = DL_0_11_COL if detection_limit == "conservative" else DL_0_03_COL
     if dl_col in df.columns:
-        df = df[df[dl_col] == True]
+        df = df[df[dl_col] == True] # type: ignore
         print(f"Detection limit ({detection_limit}): {len(df)} obs retained")
     
     # Relative uncertainty filter
     if max_rel_err and "rel_err_total" in df.columns:
-        df = df[df["rel_err_total"] <= max_rel_err]
+        df = df[df["rel_err_total"] <= max_rel_err] # type: ignore
         print(f"Max rel. error ({max_rel_err:.0%}): {len(df)} obs retained")
     
     # Minimum observation days
     if min_days and "n_days_satellite" in df.columns:
-        df = df[df["n_days_satellite"] >= min_days]
+        df = df[df["n_days_satellite"] >= min_days] # type: ignore
         print(f"Min days ({min_days}): {len(df)} obs retained")
     
     n_after = len(df)

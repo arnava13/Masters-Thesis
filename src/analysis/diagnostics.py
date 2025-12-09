@@ -10,7 +10,7 @@ import pandas as pd
 import numpy as np
 from typing import Optional, List, Dict, Tuple
 import matplotlib.pyplot as plt
-import seaborn as sns
+from matplotlib.pyplot import Figure # type: ignore
 
 # Default values (can be overridden via function parameters)
 FAC_ID_COL = "idx"
@@ -113,7 +113,7 @@ def plot_treatment_distribution(
     treatment_col: str = TREATMENT_COL,
     by_year: bool = True,
     figsize: Tuple[int, int] = (12, 5)
-) -> plt.Figure:
+) -> Figure:
     """
     Plot distribution of continuous treatment variable.
     """
@@ -161,7 +161,7 @@ def plot_treatment_timing(
     cohort_col: str = COHORT_COL,
     id_col: str = FAC_ID_COL,
     figsize: Tuple[int, int] = (10, 6)
-) -> plt.Figure:
+) -> Figure:
     """
     Visualize treatment timing (cohort distribution).
     """
@@ -175,8 +175,8 @@ def plot_treatment_timing(
     treated_cohorts = cohort_counts[cohort_counts.index > 0]
     
     # Plot
-    x = list(treated_cohorts.index) + ["Never\nTreated"]
-    y = list(treated_cohorts.values) + [never_treated]
+    x = list(str(treated_cohorts.index)) + ["Never\nTreated"] # type: ignore
+    y = list(treated_cohorts.values) + [never_treated] # type: ignore
     colors = ["steelblue"] * len(treated_cohorts) + ["gray"]
     
     bars = ax.bar(range(len(x)), y, color=colors, edgecolor="white", alpha=0.8)
@@ -228,11 +228,11 @@ def compute_covariate_balance(
     
     if baseline_only and COHORT_COL in df.columns:
         # Use only pre-treatment observations
-        df = df[(df[COHORT_COL] == 0) | (df[YEAR_COL] < df[COHORT_COL])]
+        df = df[(df[COHORT_COL] == 0) | (df[YEAR_COL] < df[COHORT_COL])] # type: ignore
     
     # Ever-treated indicator (facility level)
     ever_treated = df.groupby(FAC_ID_COL)[treatment_col].max()
-    df = df.merge(ever_treated.rename("ever_treated"), on=FAC_ID_COL, how="left")
+    df = df.merge(ever_treated.rename("ever_treated"), on=FAC_ID_COL, how="left") # type: ignore
     
     # Compute means by group
     treated = df[df["ever_treated"] == 1]
@@ -252,8 +252,8 @@ def compute_covariate_balance(
         # T-test
         from scipy import stats
         t_stat, p_val = stats.ttest_ind(
-            treated[cov].dropna(), 
-            control[cov].dropna(),
+            treated[cov].dropna(), # type: ignore
+            control[cov].dropna(), # type: ignore
             equal_var=False
         )
         
@@ -283,7 +283,7 @@ def plot_covariate_balance(
     balance_df: pd.DataFrame,
     threshold: float = 0.1,
     figsize: Tuple[int, int] = (8, 6)
-) -> plt.Figure:
+) -> Figure:
     """
     Love plot showing covariate balance (SMD).
     """
@@ -328,7 +328,7 @@ def plot_outcome_trends(
     outcome_col: str = OUTCOME_COL,
     treatment_col: str = TREATMENT_DISCRETE_COL,
     figsize: Tuple[int, int] = (10, 6)
-) -> plt.Figure:
+) -> Figure:
     """
     Plot outcome trends for treated vs control groups.
     """
@@ -336,7 +336,7 @@ def plot_outcome_trends(
     
     # Get ever-treated indicator
     ever_treated = df.groupby(FAC_ID_COL)[treatment_col].max()
-    df = df.merge(ever_treated.rename("ever_treated"), on=FAC_ID_COL, how="left")
+    df = df.merge(ever_treated.rename("ever_treated"), on=FAC_ID_COL, how="left") # type: ignore
     
     # Mean outcome by year and treatment status
     trends = df.groupby([YEAR_COL, "ever_treated"])[outcome_col].mean().unstack()
@@ -364,7 +364,7 @@ def plot_treatment_outcome_scatter(
     outcome_col: str = OUTCOME_COL,
     color_by: Optional[str] = YEAR_COL,
     figsize: Tuple[int, int] = (10, 6)
-) -> plt.Figure:
+) -> Figure:
     """
     Scatter plot of treatment vs outcome.
     """
@@ -397,7 +397,7 @@ def plot_treatment_outcome_scatter(
         df_plot[treatment_col], df_plot[outcome_col]
     )
     x_line = np.linspace(df_plot[treatment_col].min(), df_plot[treatment_col].max(), 100)
-    ax.plot(x_line, intercept + slope * x_line, "r--", 
+    ax.plot(x_line, intercept + slope * x_line, "r--", # type: ignore
             label=f"OLS: slope={slope:.4f} (p={p:.4f})")
     
     ax.axvline(1.0, color="gray", linestyle=":", alpha=0.5, label="Ratio = 1")

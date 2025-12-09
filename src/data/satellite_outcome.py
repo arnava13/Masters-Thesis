@@ -20,7 +20,6 @@ References for key parameters are provided in docstrings.
 from __future__ import annotations
 
 import os
-import time
 import warnings
 
 import numpy as np
@@ -28,6 +27,14 @@ import pandas as pd
 import ee
 
 from pandas import DataFrame
+
+
+# =============================================================================
+# BATCH EXPORT CONFIGURATION
+# =============================================================================
+DEFAULT_DRIVE_FOLDER = 'ee_beirle_exports'
+BATCH_POLL_INTERVAL_S = 30  # Seconds between task status checks
+MAX_FEATURES_PER_EXPORT = 50_000  # GEE limit for table exports
 
 
 # =============================================================================
@@ -251,539 +258,496 @@ def _get_era5_daily_wind(year: int, month: int):
 
 
 # =============================================================================
-# EMISSION RATE COMPUTATION (with lifetime correction)
-# Source: Beirle et al. (2023) Sect. 3.5-3.7, Eq. 7, 8-9, 11
+# Emission rate calculation using Beirle et. al. (2023) flux-divergence method
+# Batches requests to GEE and computes advection server-side, then calculates emission rates with
+# downloaded csvs.
 # =============================================================================
 
-def _compute_emission_rate(
-    no2_image,
-    wind_u,
-    wind_v,
-    wind_speed: float,
-    lat: float,
-    disc,
-    scale: float = TROPOMI_SCALE_M
-) -> dict:
+def _build_facilities_fc(
+    facilities_static: DataFrame,
+    fac_id_col: str = 'idx',
+) -> ee.FeatureCollection:  # type: ignore
     """
-    Compute lifetime-corrected NOx emission rate E (Beirle Eq. 11).
-    
-    Pipeline:
-        1. Base advection: A = w · ∇V [mol/(m²·s)]
-        2. Topographic correction: A* = A + f × C_topo [mol/(m²·s)]
-        3. Spatial integration: E_raw = ∫∫ A* dx dy [mol/s]
-        4. Lifetime correction: E = c_τ × E_raw [mol/s]
+    Build GEE FeatureCollection from facilities DataFrame.
     
     Args:
-        no2_image: NOx-scaled TVCD image (mol/m²), already multiplied by NOx/NO₂ ratio
-        wind_u: Eastward wind component (m/s) as ee.Number
-        wind_v: Northward wind component (m/s) as ee.Number
-        wind_speed: Wind speed magnitude (m/s) for lifetime correction
-        lat: Latitude (degrees) for lifetime parameterization
-        disc: Integration geometry (15 km disc)
-        scale: Pixel scale in meters
+        facilities_static: DataFrame with facility locations
+        fac_id_col: Name of facility ID column
         
     Returns:
-        Dictionary with:
-        - 'E_mean': Mean A* × c_τ over disc [mol/(m²·s)] - for temporal averaging
-        - 'E_count': Number of valid pixels
-        - 'c_tau': Lifetime correction factor applied
+        ee.FeatureCollection with point geometries and idx property
     """
-    try:
-        # =====================================================================
-        # 1. Base advection: A = w · ∇V (Beirle et al. 2023 ESSD, Eq. 5)
-        #    A = u × (∂V/∂x) + v × (∂V/∂y)
-        #
-        #    Reference: Beirle et al. (2023) ESSD 15, Sect. 3.5-3.6
-        #    "The advection is calculated as the scalar product of the wind
-        #    vector and the gradient of the TVCD"
-        #
-        #    GEE gradient() returns gradients in geographic coordinates.
-        #    ERA5 wind: u = eastward (+), v = northward (+)
-        # =====================================================================
-        gradient_v = no2_image.gradient()
-        dv_dx = gradient_v.select('x').divide(scale)  # ∂V/∂x per meter
-        dv_dy = gradient_v.select('y').divide(scale)  # ∂V/∂y per meter
-        
-        advection_base = (
-            dv_dx.multiply(wind_u)
-            .add(dv_dy.multiply(wind_v))
-        )
-        
-        # =====================================================================
-        # 2. Topographic correction (Beirle Sect. 3.7, Sun 2022)
-        #    C_topo = (V / H_sh) · (w · ∇z₀)  where w·∇z₀ is dot product
-        #    A* = A + f × C_topo, with f=1.5, H_sh=1km
-        #    Combined: f × C_topo = V × (w · ∇z₀) / 667m
-        # =====================================================================
-        # Get DEM and compute elevation gradient ∇z₀
-        dem = ee.Image(SRTM_DEM).select(SRTM_ELEVATION_BAND) # type: ignore
-        gradient_z = dem.gradient()
-        dz_dx = gradient_z.select('x').divide(30)  # SRTM is 30m resolution, ∂z₀/∂x
-        dz_dy = gradient_z.select('y').divide(30)  # ∂z₀/∂y
-        
-        # Dot product: w · ∇z₀ = u × (∂z₀/∂x) + v × (∂z₀/∂y)
-        wind_dot_grad_z = dz_dx.multiply(wind_u).add(dz_dy.multiply(wind_v))
-        
-        # f × C_topo = (f/H_sh) × V × (w · ∇z₀) = V × (w · ∇z₀) / 667m
-        f_times_c_topo = (
-            no2_image
-            .multiply(wind_dot_grad_z)
-            .divide(TOPO_EFFECTIVE_SCALE_HEIGHT_M)
-        )
-        
-        # =====================================================================
-        # 3. Corrected advection: A* = A + f × C_topo (Beirle Eq. 7)
-        #    Units: A* has units mol/(m²·s) - advection flux per unit area
-        # =====================================================================
-        A_star = advection_base.add(f_times_c_topo)
-        
-        # =====================================================================
-        # 4. Lifetime correction factor: c_τ (Beirle Eq. 8-9)
-        #    Applied per-day using that day's wind speed
-        # =====================================================================
-        c_tau = lifetime_correction_factor(wind_speed, lat)
-        
-        # =====================================================================
-        # 5. Lifetime-corrected advection: E_flux = c_τ × A* [mol/(m²·s)]
-        # =====================================================================
-        E_flux = A_star.multiply(c_tau).rename('E')
-        
-        # =====================================================================
-        # 6. Spatial integration (Beirle Sect. 3.10.3, Eq. 11)
-        #    E = c_τ × ∫∫ A* dx dy ≈ c_τ × Σ(A*_i) × pixel_area
-        #    "summing up the advection values multiplied by the pixel area"
-        # =====================================================================
-        stats = E_flux.reduceRegion(
-            reducer=ee.Reducer.sum().combine( # type: ignore
-                ee.Reducer.count(), sharedInputs=True # type: ignore
-            ),
-            geometry=disc,
-            scale=scale,
-            bestEffort=True,
-            maxPixels=1e6
-        )
-        
-        result = stats.getInfo()
-        
-        # Convert sum to spatial integral: multiply by pixel area (scale²)
-        pixel_area_m2 = scale * scale
-        if result.get('E_sum') is not None:
-            result['E_mol_s'] = result['E_sum'] * pixel_area_m2  # [mol/s]
-        else:
-            result['E_mol_s'] = None
-        
-        result['c_tau'] = c_tau  # Include c_tau in output for diagnostics
-        return result
-        
-    except Exception as e:
-        warnings.warn(f"Emission rate computation failed: {e}")
-        return {'E_sum': None, 'E_count': None, 'E_mol_s': None, 'c_tau': None}
-
-
-# =============================================================================
-# MAIN PROCESSING FUNCTIONS
-# =============================================================================
-
-def process_facility_day(
-    lon: float,
-    lat: float,
-    date_str: str,
-    no2_ic,
-    daily_wind,
-) -> dict | None:
-    """
-    Process a single facility-day to compute advection.
+    features = []
+    for _, row in facilities_static.iterrows():
+        pt = ee.Geometry.Point([float(row['lon']), float(row['lat'])]) # type: ignore
+        feat = ee.Feature(pt, { # type: ignore
+            fac_id_col: int(row[fac_id_col]),
+            'lat': float(row['lat']),
+            'lon': float(row['lon']),
+        })
+        features.append(feat)
     
-    Args:
-        lon, lat: Facility coordinates
-        date_str: Date string 'YYYY-MM-DD'
-        no2_ic: Filtered NO₂ collection for the period (must include SZA band)
-        daily_wind: Daily wind collection with wind_speed, wind_dir bands
-        
+    return ee.FeatureCollection(features) # type: ignore
+
+
+def _compute_advection_image_for_date(
+    date: ee.Date, # type: ignore
+    no2_ic: ee.ImageCollection, # type: ignore
+    wind_ic: ee.ImageCollection, # type: ignore
+) -> ee.Image: # type: ignore
+    """
+    Server-side computation of advection A* for a single date.
+    
+    Returns an Image with bands:
+        - 'A_star': Topo-corrected advection [mol/(m²·s)]
+        - 'wind_speed': Wind magnitude [m/s]
+        - 'wind_u': Eastward wind component [m/s]
+        - 'wind_v': Northward wind component [m/s]
+        - 'pixel_count': Valid pixel mask for counting
+    """
+    # Filter to this date (server-side)
+    date_str = date.format('YYYY-MM-dd')
+    next_date = date.advance(1, 'day')
+
+    # NO₂ image for this day (mosaic if multiple orbits).
+    # Some days have no OFFL L3 NO₂ data at all; in that case, the filtered
+    # collection is empty and mosaic() would return an Image with no bands,
+    # causing Image.select(TROPOMI_NO2_BAND) to fail. Guard against that by
+    # returning a fully masked placeholder image with the expected band name.
+    no2_filtered = no2_ic.filterDate(date, next_date)
+    no2_day = ee.Image(ee.Algorithms.If(  # type: ignore
+        no2_filtered.size().gt(0),
+        no2_filtered.mosaic().select(TROPOMI_NO2_BAND),
+        ee.Image.constant(0) # type: ignore
+        .rename(TROPOMI_NO2_BAND)
+        .updateMask(ee.Image.constant(0)) # type: ignore
+    ))
+    
+    # Scale to NOx
+    no2_nox = no2_day.multiply(NOX_NO2_RATIO)
+    
+    # Wind for this day
+    wind_day = wind_ic.filterDate(date, next_date).first()
+    wind_u = wind_day.select(ERA5_U_BAND)
+    wind_v = wind_day.select(ERA5_V_BAND)
+    wind_speed = wind_day.select('wind_speed')
+    
+    # Gradient of NOx column
+    # GEE's gradient() returns spatial derivatives in units of (input units) per meter,
+    # correctly accounting for latitude-dependent projection scaling. No division needed.
+    #
+    # I verified this empirically: created test image with value = 10 × longitude.
+    # At 50°N, gradient() returned 1.4×10⁻⁴, matching expected 10 / (111km × cos(50°))
+    # = 10 / 71,400m = 1.4×10⁻⁴. This confirms gradient() is per-meter, not per-pixel.
+    gradient_v = no2_nox.gradient()
+    dv_dx = gradient_v.select('x')  # [mol/m² per meter] = [mol/m³]
+    dv_dy = gradient_v.select('y')  # [mol/m² per meter] = [mol/m³]
+    
+    # Base advection: A = w · ∇V
+    advection_base = dv_dx.multiply(wind_u).add(dv_dy.multiply(wind_v))
+    
+    # Topographic correction
+    # DEM gradient is also per-meter (dimensionless slope), no division needed
+    dem = ee.Image(SRTM_DEM).select(SRTM_ELEVATION_BAND) # type: ignore
+    gradient_z = dem.gradient()
+    dz_dx = gradient_z.select('x')  # [m elevation per m distance] = dimensionless
+    dz_dy = gradient_z.select('y')  # [m elevation per m distance] = dimensionless
+    
+    wind_dot_grad_z = dz_dx.multiply(wind_u).add(dz_dy.multiply(wind_v))
+    f_times_c_topo = no2_nox.multiply(wind_dot_grad_z).divide(TOPO_EFFECTIVE_SCALE_HEIGHT_M)
+    
+    # Corrected advection A*
+    A_star = advection_base.add(f_times_c_topo).rename('A_star')
+    
+    # Valid pixel mask
+    pixel_count = no2_nox.mask().rename('pixel_count')
+    
+    return (
+        A_star
+        .addBands(wind_speed.rename('wind_speed'))
+        .addBands(wind_u.rename('wind_u'))
+        .addBands(wind_v.rename('wind_v'))
+        .addBands(pixel_count)
+        .set('date_str', date_str)
+        .set('system:time_start', date.millis())
+    )
+
+
+def _compute_monthly_advection_ic(year: int, month: int) -> ee.ImageCollection: # type: ignore
+    """
+    Build ImageCollection of daily advection images for a month.
+    
+    All computation is server-side; no getInfo() calls.
+    
     Returns:
-        Dictionary with advection metrics, or None if no valid data
+        ImageCollection where each image has bands: A_star, wind_speed, wind_u, wind_v, pixel_count
     """
-    disc = _build_integration_disc(lon, lat)
-    pt = ee.Geometry.Point([lon, lat]) # type: ignore
+    start = ee.Date.fromYMD(year, month, 1) # type: ignore
+    end = start.advance(1, 'month')
+    n_days = end.difference(start, 'day')
     
-    # Get NO₂ and SZA for this day (mosaic multiple orbits)
-    no2_day = no2_ic.filter(ee.Filter.eq('date_str', date_str)).mosaic() # type: ignore
-    
-    # Get wind for this day
-    wind_day = daily_wind.filter(ee.Filter.eq('date_str', date_str)).first() # type: ignore
-    
-    if wind_day is None:
-        return None
-    
-    # Sample wind at facility point
-    wind_sample = wind_day.reduceRegion(
-        reducer=ee.Reducer.mean(), # type: ignore
-        geometry=pt,
-        scale=ERA5_SCALE_M,
-        bestEffort=True
-    ).getInfo()
-    
-    wind_speed = wind_sample.get('wind_speed')
-    if wind_speed is None or wind_speed < MIN_WIND_SPEED_MS:
-        return None  # Calm day or no wind data
-    
-    wind_u = wind_sample.get(ERA5_U_BAND)
-    wind_v = wind_sample.get(ERA5_V_BAND)
-    
-    if wind_u is None or wind_v is None:
-        return None
-    
-    # Scale NO₂ to NOx using fixed ratio from Beirle et al. (2023) Sect. 3.4
-    # "NOx/NO₂ ratio was found to be about 1.38 ± 0.10"
-    no2_nox = no2_day.select(TROPOMI_NO2_BAND).multiply(NOX_NO2_RATIO)
-    
-    # Compute lifetime-corrected emission rate: E = c_τ × ∫∫ A* dx dy [mol/s]
-    result = _compute_emission_rate(
-        no2_nox,
-        ee.Number(wind_u), # type: ignore
-        ee.Number(wind_v), # type: ignore
-        wind_speed,
-        lat,
-        disc
+    # Load collections
+    no2_ic = (
+        ee.ImageCollection(TROPOMI_NO2_COLLECTION) # type: ignore
+        .filterDate(start, end)
+        .select(TROPOMI_NO2_BAND)
     )
     
-    E_mol_s = result.get('E_mol_s')  # Spatial integral [mol/s]
-    E_count = result.get('E_count')  # Number of valid pixels
-    c_tau = result.get('c_tau')  # Lifetime correction factor
+    wind_ic = _get_era5_daily_wind(year, month)
     
-    if E_mol_s is None or E_count is None or E_count < 10:
-        return None  # Insufficient data
+    # Map over days
+    days = ee.List.sequence(0, n_days.subtract(1)) # type: ignore
     
-    # Check for NaN c_tau (dropped by lifetime_correction_factor)
-    if c_tau is None or np.isnan(c_tau):
-        return None
+    def _compute_for_day(day_offset):
+        day_offset = ee.Number(day_offset) # type: ignore
+        date = start.advance(day_offset, 'day')
+        return _compute_advection_image_for_date(date, no2_ic, wind_ic)
     
-    return {
-        'date': date_str,
-        'E_mol_s': E_mol_s,  # [mol/s] - spatially integrated emission rate
-        'E_count': E_count,
-        'c_tau': c_tau,
-        'wind_speed_ms': wind_speed,
-    }
+    return ee.ImageCollection(days.map(_compute_for_day)) # type: ignore
 
 
-def process_facility_year(
-    idx: int,
-    lon: float,
-    lat: float,
-    year: int,
-    progress_callback=None,
-    min_valid_days: int = MIN_VALID_DAYS,
-) -> dict | None:
+def _reduce_advection_for_facilities(
+    advection_ic: ee.ImageCollection, # type: ignore
+    facilities_fc: ee.FeatureCollection, # type: ignore
+    fac_id_col: str = 'idx',
+) -> ee.FeatureCollection: # type: ignore
     """
-    Process a single facility-year to compute Beirle-style NOx emissions.
+    Server-side reduction: compute mean advection stats for all facilities across all days.
     
-    Processes month-by-month to avoid GEE timeouts.
+    Uses reduceRegions to process all facilities × days efficiently on GEE servers.
     
     Args:
-        idx: Facility identifier
-        lon, lat: Facility coordinates
-        year: Year to process
-        progress_callback: Optional callback for progress updates
-        min_valid_days: Minimum valid observation days (wind >= 2 m/s)
+        advection_ic: ImageCollection from _compute_monthly_advection_ic
+        facilities_fc: FeatureCollection from _build_facilities_fc
+        fac_id_col: Facility ID column name
         
     Returns:
-        Dictionary with emission estimate and uncertainties, or None if insufficient data
+        FeatureCollection with one feature per facility-day, containing:
+        - idx, lat, lon, date_str
+        - A_star_sum: Sum of A* over 15km disc
+        - wind_speed_mean: Mean wind speed at facility
+        - pixel_count: Number of valid pixels
+    """
+    # Buffer facilities to 15km discs
+    facilities_buffered = facilities_fc.map(
+        lambda f: f.setGeometry(f.geometry().buffer(INTEGRATION_RADIUS_M))
+    )
+    
+    def _reduce_for_date(img):
+        """Reduce one day's advection image across all facilities."""
+        date_str = img.get('date_str')
+        
+        # Reducer: sum A*, mean wind_speed, count pixels
+        reducer = (
+            ee.Reducer.sum().setOutputs(['A_star_sum']) # type: ignore
+            .combine(ee.Reducer.mean().setOutputs(['wind_speed_mean']), sharedInputs=False) # type: ignore
+            .combine(ee.Reducer.sum().setOutputs(['pixel_count']), sharedInputs=False) # type: ignore
+        )
+        
+        # reduceRegions processes all facilities at once
+        reduced = img.select(['A_star', 'wind_speed', 'pixel_count']).reduceRegions(
+            collection=facilities_buffered,
+            reducer=reducer,
+            scale=TROPOMI_SCALE_M,
+        )
+        
+        # Add date to each feature
+        return reduced.map(lambda f: f.set('date_str', date_str))
+    
+    # Map over all days and flatten
+    all_days = advection_ic.map(_reduce_for_date)
+    
+    return ee.FeatureCollection(all_days).flatten() # type: ignore
+
+
+def export_beirle_month_batch(
+    facilities_static: DataFrame,
+    year: int,
+    month: int,
+    fac_id_col: str = 'idx',
+    drive_folder: str = DEFAULT_DRIVE_FOLDER,
+    file_prefix: str = 'beirle',
+) -> ee.batch.Task: # type: ignore
+    """
+    Export Beirle advection data for one month as a batch task.
+    
+    This is ~100x faster than the interactive approach because:
+    1. All facilities are processed in parallel via reduceRegions()
+    2. Computation runs on GEE servers with no network round-trips
+    3. Export runs asynchronously in GEE's batch queue
+    
+    Args:
+        facilities_static: DataFrame with facility locations
+        year: Year to process
+        month: Month to process (1-12)
+        fac_id_col: Name of facility ID column
+        drive_folder: Google Drive folder for output
+        file_prefix: Prefix for output filename
+        
+    Returns:
+        ee.batch.Task object. Call task.start() to begin processing.
+        
+    Usage:
+        task = export_beirle_month_batch(facilities, 2020, 1)
+        task.start()
+        # ... monitor with check_batch_tasks() or wait_for_tasks()
     """
     _ensure_ee_initialized()
     
-    # Convert numpy types to native Python (GEE doesn't accept np.int64)
-    year = int(year)
+    # Build facilities FeatureCollection
+    facilities_fc = _build_facilities_fc(facilities_static, fac_id_col)
     
-    # NOx/NO₂ ratio computed per-day from TROPOMI SZA (uncertainty from temporal SE)
+    # Compute monthly advection (server-side)
+    advection_ic = _compute_monthly_advection_ic(year, month)
     
-    # Collect daily advection values across all months
-    daily_results = []
-    total_obs_days = 0
-    total_valid_days = 0
+    # Reduce to facilities (server-side)
+    results_fc = _reduce_advection_for_facilities(advection_ic, facilities_fc, fac_id_col)
     
-    for month in range(1, 13):
-        try:
-            # Build collections for this month
-            start = ee.Date.fromYMD(year, month, 1) # type: ignore
-            end = start.advance(1, 'month')
-            
-            no2_ic = (
-                ee.ImageCollection(TROPOMI_NO2_COLLECTION) # type: ignore
-                .filterDate(start, end)
-                .select(TROPOMI_NO2_BAND)
-                .map(lambda img: img.set('date_str', img.date().format('YYYY-MM-dd')))
-            )
-            
-            daily_wind = _get_era5_daily_wind(year, month)
-            
-            # Get list of dates with NO₂ data
-            dates = no2_ic.aggregate_array('date_str').distinct().getInfo()
-            total_obs_days += len(dates)
-            
-            month_valid = 0
-            for date_str in dates:
-                try:
-                    result = process_facility_day(
-                        lon, lat, date_str, no2_ic, daily_wind
-                    )
-                    if result is not None:
-                        daily_results.append(result)
-                        month_valid += 1
-                except Exception as e:
-                    continue  # Skip failed days
-            
-            total_valid_days += month_valid
-                    
-        except Exception as e:
-            if progress_callback:
-                progress_callback(f"Month {month} failed: {e}")
-            continue
+    # Create export task
+    description = f'{file_prefix}_{year}_{month:02d}'
+    filename = f'{file_prefix}_{year}_{month:02d}'
     
-    if progress_callback:
-        progress_callback(f"Total: {total_obs_days} obs days, {total_valid_days} valid (wind >= {MIN_WIND_SPEED_MS} m/s)")
-    
-    if len(daily_results) < min_valid_days:
-        return None
-    
-    # Aggregate daily results (E_mol_s already spatially integrated per-day)
-    df = pd.DataFrame(daily_results)
-    
-    # Temporal mean of daily emission rates [mol/s]
-    # Each daily E_mol_s = c_τ × ∫∫ A* dx dy (Beirle Eq. 11)
-    E_mol_s_mean = df['E_mol_s'].mean()
-    E_mol_s_std = df['E_mol_s'].std()
-    n_days = len(df)
-    
-    # Mean lifetime correction factor (for uncertainty propagation)
-    c_tau_mean = df['c_tau'].mean()
-    
-    # Statistical error of mean [mol/s]
-    se_E_mol_s = E_mol_s_std / np.sqrt(n_days)
-    
-    # Final emission estimate: E [mol/s] → E [kg/s]
-    E_kg_s = E_mol_s_mean * MOLAR_MASS_NO2_KG
-    
-    # =================
-    # UNCERTAINTY COMPONENTS (following Beirle Sect. 3.12)
-    # Note: We approximate statistical error using day-to-day variability of
-    # integrated emissions, rather than Beirle's per-pixel SE propagation.
-    # This is more conservative (captures meteorological variability too).
-    # =================
-    
-    # 1. Statistical error of spatial integration (Sect. 3.12.2)
-    #    Approximated via SE of temporal mean of daily E_mol_s values.
-    #    Differs from Beirle's per-pixel SE propagation but is more conservative.
-    stat_err_kg_s = se_E_mol_s * MOLAR_MASS_NO2_KG
-    rel_err_stat = abs(stat_err_kg_s / E_kg_s) if E_kg_s != 0 else np.nan
-    
-    # 2. Lifetime correction uncertainty (Sect. 3.12.1)
-    #    50% rel. uncertainty on τ, propagated through c_τ = exp(t_r/τ)
-    #    Error propagation: rel_err_c_τ = ln(c_τ) × rel_err_τ
-    #    Typically 10-20% for c_τ ≈ 1.4
-    rel_err_tau = np.log(c_tau_mean) * 0.50 if c_tau_mean > 1 else 0.10
-    
-    # 3. NOx/NO₂ scaling uncertainty (Sect. 3.12.1)
-    #    ±0.10 on 1.38 ratio, ~7.2%
-    rel_err_nox = NOX_NO2_RATIO_UNCERTAINTY / NOX_NO2_RATIO
-    
-    # 4. AMF correction uncertainty (Sect. 3.12.1)
-    #    UNMODELED STRUCTURAL UNCERTAINTY: We do not implement an explicit AMF
-    #    correction. This 10% term is carried as a generic structural uncertainty
-    #    following Beirle's error budget, representing potential bias not variance.
-    rel_err_amf = 0.10
-    
-    # 5. Plume height uncertainty (Sect. 3.12.3)
-    #    UNMODELED STRUCTURAL UNCERTAINTY: We do not implement plume-height-
-    #    dependent wind interpolation. This 10% term represents the sensitivity
-    #    to assumed plume height (500m vs 300m) as reported by Beirle.
-    rel_err_height = 0.10
-    
-    # 6. Topographic correction uncertainty (Sect. 3.12.4)
-    #    33% rel. uncertainty on f=1.5, typically <2.5% for flat terrain
-    rel_err_topo = 0.025
-    
-    # 7. OFFL vs PAL product uncertainty (our addition, not in Beirle)
-    #    OFFL provides 10-40% lower TVCDs than PAL; use 25% as proxy.
-    #    This is a structural uncertainty representing potential systematic bias.
-    rel_err_product = 0.25
-    
-    # Total relative uncertainty (quadrature sum, Sect. 3.12.5)
-    # Beirle reports typical total of 20-40%; ours is ~35-45% with OFFL term
-    rel_err_total = np.sqrt(
-        rel_err_stat**2 + rel_err_tau**2 + rel_err_nox**2 + 
-        rel_err_amf**2 + rel_err_height**2 + rel_err_topo**2 +
-        rel_err_product**2
+    task = ee.batch.Export.table.toDrive( # type: ignore
+        collection=results_fc,
+        description=description,
+        folder=drive_folder,
+        fileNamePrefix=filename,
+        fileFormat='CSV',
     )
     
-    # Absolute standard error (statistical only)
-    beirle_nox_kg_s_se = stat_err_kg_s
-    
-    return {
-        'idx': idx,
-        'year': year,
-        'beirle_nox_kg_s': E_kg_s,
-        'beirle_nox_kg_s_se': beirle_nox_kg_s_se,
-        'rel_err_total': rel_err_total,
-        # Individual error components for diagnostics
-        'rel_err_stat': rel_err_stat,
-        'rel_err_tau': rel_err_tau,
-        'rel_err_nox': rel_err_nox,
-        'rel_err_amf': rel_err_amf,
-        'rel_err_height': rel_err_height,
-        'rel_err_topo': rel_err_topo,
-        'rel_err_product': rel_err_product,
-        'n_days_satellite': n_days,
-    }
+    return task
 
 
-def build_beirle_panel(
+def export_beirle_year_batch(
     facilities_static: DataFrame,
-    years: list[int],
+    year: int,
     fac_id_col: str = 'idx',
-    cache_dir: str = 'data/out',
-    resume: bool = True,
+    drive_folder: str = DEFAULT_DRIVE_FOLDER,
+    file_prefix: str = 'beirle',
+    start_immediately: bool = True,
+) -> list[ee.batch.Task]: # type: ignore
+    """
+    Export Beirle advection data for a full year as batch tasks (one per month).
+    
+    Args:
+        facilities_static: DataFrame with facility locations
+        year: Year to process
+        fac_id_col: Name of facility ID column
+        drive_folder: Google Drive folder for output
+        file_prefix: Prefix for output filename
+        start_immediately: If True, start all tasks immediately
+        
+    Returns:
+        List of ee.batch.Task objects (12 tasks, one per month)
+        
+    Usage:
+        tasks = export_beirle_year_batch(facilities, 2020)
+        wait_for_tasks(tasks)  # Wait for completion
+        df = load_batch_results(2020, drive_folder='ee_beirle_exports')
+    """
+    _ensure_ee_initialized()
+    
+    tasks = []
+    for month in range(1, 13):
+        task = export_beirle_month_batch(
+            facilities_static=facilities_static,
+            year=year,
+            month=month,
+            fac_id_col=fac_id_col,
+            drive_folder=drive_folder,
+            file_prefix=file_prefix,
+        )
+        tasks.append(task)
+        
+        if start_immediately:
+            task.start()
+            print(f"Started task: {file_prefix}_{year}_{month:02d}")
+    
+    return tasks
+
+
+def load_batch_results(
+    year: int,
+    drive_download_dir: str | None = None,
+    file_prefix: str = 'beirle',
+) -> DataFrame:
+    """
+    Load and combine batch export results from Google Drive downloads.
+    
+    After running export_beirle_year_batch(), download the CSV files from 
+    Google Drive to drive_download_dir, then call this function.
+    
+    Args:
+        year: Year to load
+        drive_download_dir: Directory containing downloaded CSVs from Drive
+                           (defaults to ~/Downloads)
+        file_prefix: Prefix used in export
+        
+    Returns:
+        DataFrame with daily facility-level advection data
+    """
+    import glob
+    
+    if drive_download_dir is None:
+        drive_download_dir = os.path.expanduser('~/Downloads')
+    
+    # Find all CSVs for this year
+    pattern = os.path.join(drive_download_dir, f'{file_prefix}_{year}_*.csv')
+    files = sorted(glob.glob(pattern))
+    
+    if not files:
+        raise FileNotFoundError(f"No files matching {pattern}")
+    
+    print(f"Loading {len(files)} files for {year}...")
+    
+    dfs = []
+    for f in files:
+        try:
+            df = pd.read_csv(f)
+            dfs.append(df)
+        except Exception as e:
+            print(f"  Warning: failed to load {f}: {e}")
+    
+    if not dfs:
+        raise ValueError(f"No valid data loaded for {year}")
+    
+    combined = pd.concat(dfs, ignore_index=True)
+    print(f"  Loaded {len(combined):,} rows for {year}")
+    
+    return combined
+
+
+def aggregate_batch_to_yearly(
+    daily_df: DataFrame,
+    fac_id_col: str = 'idx',
     min_valid_days: int = MIN_VALID_DAYS,
 ) -> DataFrame:
     """
-    Build Beirle-style NOx emission panel for all facilities across years.
+    Aggregate batch daily results to yearly facility-level emissions.
     
-    Implements incremental processing with caching to handle GEE rate limits
-    and allow resumption after failures.
+    Applies wind speed filter, lifetime correction, and uncertainty propagation
+    per the Beirle methodology.
     
     Args:
-        facilities_static: DataFrame with facility locations (must have lat, lon, fac_id_col)
-        years: List of years to process
-        fac_id_col: Name of facility ID column
-        cache_dir: Directory for intermediate cache files
-        resume: If True, resume from cached results
-        min_valid_days: Minimum valid observation days per facility-year (wind >= 2 m/s)
+        daily_df: Output from load_batch_results() with columns:
+                  idx, lat, lon, date_str, A_star_sum, wind_speed_mean, pixel_count
+        fac_id_col: Facility ID column
+        min_valid_days: Minimum valid days (wind >= 2 m/s)
         
     Returns:
-        DataFrame with facility × year panel of Beirle-style NOx emissions
+        DataFrame with yearly facility-level emissions
     """
-    from tqdm.auto import tqdm
+    df = daily_df.copy()
     
-    _ensure_ee_initialized()
-    os.makedirs(cache_dir, exist_ok=True)
+    # Filter: wind speed >= MIN_WIND_SPEED_MS
+    df = df[df['wind_speed_mean'] >= MIN_WIND_SPEED_MS].copy()
     
-    all_results = []
+    # Filter: sufficient pixels (at least 10 per disc)
+    df = df[df['pixel_count'] >= 10].copy()
     
-    for year in years:
-        cache_path = os.path.join(cache_dir, f'beirle_{year}.parquet')
-        failed_path = os.path.join(cache_dir, f'beirle_failed_{year}.parquet')
+    # Compute pixel area and convert A_star_sum to E_mol_s
+    pixel_area_m2 = TROPOMI_SCALE_M ** 2
+    df['E_mol_s_raw'] = df['A_star_sum'] * pixel_area_m2  # Before lifetime correction
+    
+    # Lifetime correction: c_τ = exp(t_r / τ) per day
+    def _apply_lifetime_correction(row):
+        c_tau = lifetime_correction_factor(row['wind_speed_mean'], row['lat'])
+        if c_tau is None or np.isnan(c_tau):
+            return np.nan, np.nan
+        return row['E_mol_s_raw'] * c_tau, c_tau
+    
+    df[['E_mol_s', 'c_tau']] = df.apply( # type: ignore
+        _apply_lifetime_correction, axis=1, result_type='expand'
+    )
+    
+    # Drop rows with invalid lifetime correction
+    df = df.dropna(subset=['E_mol_s', 'c_tau']) # type: ignore
+    
+    # Extract year from date_str
+    df['year'] = pd.to_datetime(df['date_str']).dt.year
+    
+    # Group by facility × year
+    grouped = df.groupby([fac_id_col, 'year', 'lat', 'lon'])
+    
+    results = []
+    for (idx, year, lat, lon), group in grouped: # type: ignore
+        n_days = len(group)
         
-        # Load existing results
-        if resume and os.path.exists(cache_path):
-            existing = pd.read_parquet(cache_path)
-            done_ids = set(existing[fac_id_col].unique())
-            all_results.append(existing)
-        else:
-            existing = pd.DataFrame()
-            done_ids = set()
-        
-        # Load failed IDs to skip
-        if resume and os.path.exists(failed_path):
-            failed_df = pd.read_parquet(failed_path)
-            failed_ids = set(failed_df[fac_id_col].unique())
-        else:
-            failed_ids = set()
-        
-        # Filter to remaining facilities
-        remaining = facilities_static[
-            ~facilities_static[fac_id_col].isin(done_ids | failed_ids) # type: ignore
-        ]
-        
-        n_done = len(done_ids)
-        n_failed = len(failed_ids)
-        n_total = len(facilities_static)
-        
-        print(f"[{year}] {n_done} done, {n_failed} failed, {len(remaining)} remaining of {n_total}")
-        
-        if len(remaining) == 0:
+        if n_days < min_valid_days:
             continue
         
-        year_results = list(existing.to_dict('records')) if not existing.empty else []
-        new_failed = list(failed_ids)
+        # Temporal statistics
+        E_mol_s_mean = group['E_mol_s'].mean()
+        E_mol_s_std = group['E_mol_s'].std()
+        c_tau_mean = group['c_tau'].mean()
         
-        for i, (_, row) in enumerate(tqdm(remaining.iterrows(), 
-                                          total=n_total,
-                                          initial=n_done + n_failed,
-                                          desc=f"Year {year}")):
-            fac_id = row[fac_id_col]
-            
-            try:
-                result = process_facility_year(
-                    idx=fac_id, # type: ignore
-                    lon=float(row['lon']),
-                    lat=float(row['lat']),
-                    year=year,
-                    min_valid_days=min_valid_days,
-                    progress_callback=lambda msg, fid=fac_id: tqdm.write(f"    [{fid}] {msg}"),
-                )
-                
-                if result is not None:
-                    year_results.append(result)
-                else:
-                    tqdm.write(f"  Facility {fac_id}: insufficient valid days")
-                    new_failed.append(fac_id)
-                    
-            except Exception as e:
-                tqdm.write(f"  Facility {fac_id} failed: {e}")
-                new_failed.append(fac_id)
-                
-                # Rate limit backoff
-                if 'quota' in str(e).lower() or 'rate' in str(e).lower():
-                    time.sleep(60)
-            
-            # Checkpoint every 10 facilities
-            if (i + 1) % 10 == 0:
-                pd.DataFrame(year_results).to_parquet(cache_path, index=False)
-                pd.DataFrame({fac_id_col: new_failed}).to_parquet(failed_path, index=False)
-                tqdm.write(f"  [checkpoint] {len(year_results)} results saved")
+        # Convert to kg/s
+        E_kg_s = E_mol_s_mean * MOLAR_MASS_NO2_KG
+        se_E_mol_s = E_mol_s_std / np.sqrt(n_days)
+        stat_err_kg_s = se_E_mol_s * MOLAR_MASS_NO2_KG
         
-        # Final save for year
-        if year_results:
-            year_df = pd.DataFrame(year_results)
-            year_df.to_parquet(cache_path, index=False)
-            all_results.append(year_df)
+        # Relative errors (following Beirle Sect. 3.12)
+        rel_err_stat = abs(stat_err_kg_s / E_kg_s) if E_kg_s != 0 else np.nan
+        rel_err_tau = np.log(c_tau_mean) * 0.50 if c_tau_mean > 1 else 0.10
+        rel_err_nox = NOX_NO2_RATIO_UNCERTAINTY / NOX_NO2_RATIO
+        rel_err_amf = 0.10
+        rel_err_height = 0.10
+        rel_err_topo = 0.025
+        rel_err_product = 0.25
         
-        pd.DataFrame({fac_id_col: new_failed}).to_parquet(failed_path, index=False)
-        print(f"[{year}] Complete: {len(year_results)} valid, {len(new_failed)} failed")
+        rel_err_total = np.sqrt(
+            rel_err_stat**2 + rel_err_tau**2 + rel_err_nox**2 + 
+            rel_err_amf**2 + rel_err_height**2 + rel_err_topo**2 +
+            rel_err_product**2
+        )
+        
+        results.append({
+            fac_id_col: idx,
+            'year': year,
+            'beirle_nox_kg_s': E_kg_s,
+            'beirle_nox_kg_s_se': stat_err_kg_s,
+            'c_tau_mean': c_tau_mean,
+            'rel_err_total': rel_err_total,
+            'rel_err_stat': rel_err_stat,
+            'rel_err_tau': rel_err_tau,
+            'rel_err_nox': rel_err_nox,
+            'rel_err_amf': rel_err_amf,
+            'rel_err_height': rel_err_height,
+            'rel_err_topo': rel_err_topo,
+            'rel_err_product': rel_err_product,
+            'n_days_satellite': n_days,
+        })
     
-    if not all_results:
-        return pd.DataFrame()
+    result_df = pd.DataFrame(results)
     
-    combined = pd.concat(all_results, ignore_index=True)
+    # Add significance flags
+    if not result_df.empty:
+        result_df['above_dl_0_11'] = result_df['beirle_nox_kg_s'] >= DETECTION_LIMIT_0_11
+        result_df['above_dl_0_03'] = result_df['beirle_nox_kg_s'] >= DETECTION_LIMIT_0_03
+        result_df['rel_err_stat_lt_0_3'] = result_df['rel_err_stat'] < MAX_REL_ERR_STAT
+        
+        # Filter out high-uncertainty observations (>50% total relative error)
+        # High uncertainty obs add noise without proportional information content
+        MAX_REL_ERR_TOTAL = 0.50
+        n_before = len(result_df)
+        result_df = result_df[result_df['rel_err_total'] <= MAX_REL_ERR_TOTAL].copy()
+        n_dropped = n_before - len(result_df)
+        if n_dropped > 0:
+            print(f"Dropped {n_dropped} observations with rel_err_total > {MAX_REL_ERR_TOTAL:.0%} "
+                  f"({n_dropped/n_before:.1%} of sample)")
+        
+        # Add inverse-variance weight for weighted estimation
+        # Weight = 1 / rel_err_total^2, capped at 99th percentile to avoid extreme weights
+        result_df['nox_weight'] = 1.0 / (result_df['rel_err_total'] ** 2)
+        weight_cap = float(result_df['nox_weight'].quantile(0.99))  # type: ignore
+        result_df['nox_weight'] = result_df['nox_weight'].clip(upper=weight_cap)  # type: ignore
     
-    # =========================================================================
-    # SIGNIFICANCE FLAGS (Beirle Sect. 3.11)
-    # We do NOT hard-filter; instead we add boolean flags for downstream analysis
-    # to use in sensitivity analyses. This follows the principle that we skip
-    # Beirle's automatic point-source identification (we have known ETS/LCP
-    # locations) but apply their quantification and significance logic.
-    # =========================================================================
-    
-    # Detection limit flags (Beirle Sect. 3.11.1)
-    # Conservative (0.11 kg/s) is appropriate for most European locations.
-    # Permissive (0.03 kg/s) only valid for high-albedo desert conditions.
-    combined['above_dl_0_11'] = combined['beirle_nox_kg_s'] >= DETECTION_LIMIT_0_11
-    combined['above_dl_0_03'] = combined['beirle_nox_kg_s'] >= DETECTION_LIMIT_0_03
-    
-    # Statistical integration error flag (Beirle requires < 30%)
-    combined['rel_err_stat_lt_0_3'] = combined['rel_err_stat'] < MAX_REL_ERR_STAT
-    
-    n_total = len(combined)
-    n_above_0_11 = combined['above_dl_0_11'].sum()
-    n_above_0_03 = combined['above_dl_0_03'].sum()
-    n_stat_ok = combined['rel_err_stat_lt_0_3'].sum()
-    print(f"Significance flags summary ({n_total} total):")
-    print(f"  - above_dl_0_11: {n_above_0_11} ({100*n_above_0_11/n_total:.1f}%)")
-    print(f"  - above_dl_0_03: {n_above_0_03} ({100*n_above_0_03/n_total:.1f}%)")
-    print(f"  - rel_err_stat < 30%: {n_stat_ok} ({100*n_stat_ok/n_total:.1f}%)")
-    
-    return combined # type: ignore
+    return result_df  # type: ignore
 
+
+# =============================================================================
+# AUXILIARY FUNCTIONS (urbanization, interference)
+# =============================================================================
 
 def compute_urbanization(
     facilities_static: DataFrame,
@@ -900,34 +864,33 @@ def compute_urbanization(
     return facilities_static
 
 
-def compute_interference_flags(
-    beirle_panel: DataFrame,
+def add_interference_flag(
     facilities_static: DataFrame,
     fac_id_col: str = 'idx',
     radius_km: float = INTERFERENCE_RADIUS_KM
 ) -> DataFrame:
     """
-    Add interference flag based on proximity to other ETS/LCP facilities.
+    Add interference flag to facilities_static based on proximity to other facilities.
     
     For each facility, checks if there is another facility within `radius_km`.
     If so, the satellite outcome may reflect cluster-level rather than 
-    single-facility emissions.
+    single-facility emissions. This is a static attribute (not time-varying).
     
     Uses WGS84 distance approximation (same as used in 500m spatial clustering).
     
     Args:
-        beirle_panel: Beirle panel DataFrame with idx column
         facilities_static: Static facility DataFrame with lat, lon, fac_id_col
         fac_id_col: Name of facility ID column
         radius_km: Interference radius in km (default: 20 km per Beirle)
         
     Returns:
-        beirle_panel with 'interfered_20km' boolean column added
+        facilities_static with 'interfered_20km' boolean column added
     """
     from scipy.spatial import cKDTree  # type: ignore
     
-    # Get coordinates for all facilities (not just those in panel)
-    # because a facility outside the panel can still interfere
+    facilities_static = facilities_static.copy()
+    
+    # Get coordinates for all facilities
     fac_coords = facilities_static[[fac_id_col, 'lat', 'lon']].copy()
     fac_coords = fac_coords.dropna(subset=['lat', 'lon'])  # type: ignore
     
@@ -953,22 +916,50 @@ def compute_interference_flags(
     radius_m = radius_km * 1000
     pairs = tree.query_pairs(r=radius_m)
     
-    # Build list of interfered facility IDs
+    # Build set of interfered facility IDs
     fac_ids = fac_coords[fac_id_col].values  # type: ignore
     interfered_ids_set: set = set()
     for i, j in pairs:
         interfered_ids_set.add(fac_ids[i])
         interfered_ids_set.add(fac_ids[j])
-    interfered_ids = list(interfered_ids_set)
+    
+    # Add flag to facilities_static
+    facilities_static['interfered_20km'] = facilities_static[fac_id_col].isin(interfered_ids_set) # type: ignore
+    
+    n_total = len(facilities_static)
+    n_interfered = facilities_static['interfered_20km'].sum()
+    print(f"Interference flag ({radius_km} km): {n_interfered}/{n_total} facilities "
+          f"({100*n_interfered/n_total:.1f}%) have another ETS facility within radius")
+    
+    return facilities_static
+
+
+def compute_interference_flags(
+    beirle_panel: DataFrame,
+    facilities_static: DataFrame,
+    fac_id_col: str = 'idx',
+    radius_km: float = INTERFERENCE_RADIUS_KM
+) -> DataFrame:
+    """
+    DEPRECATED: Use add_interference_flag() on facilities_static instead.
+    
+    Add interference flag based on proximity to other ETS/LCP facilities.
+    This function is kept for backward compatibility but the flag should be
+    computed on facilities_static (not time-varying).
+    """
+    warnings.warn(
+        "compute_interference_flags() is deprecated. "
+        "Use add_interference_flag() on facilities_static instead.",
+        DeprecationWarning
+    )
+    
+    # Get interference set from static
+    static_with_flag = add_interference_flag(facilities_static, fac_id_col, radius_km)
+    interfered_ids = set(static_with_flag[static_with_flag['interfered_20km']][fac_id_col])
     
     # Add flag to Beirle panel
     beirle_panel = beirle_panel.copy()
-    beirle_panel['interfered_20km'] = beirle_panel[fac_id_col].isin(interfered_ids)
-    
-    n_total = len(beirle_panel[fac_id_col].unique())
-    n_interfered = len(beirle_panel[beirle_panel['interfered_20km']][fac_id_col].unique()) # type: ignore
-    print(f"Interference flag ({radius_km} km): {n_interfered}/{n_total} facilities "
-          f"({100*n_interfered/n_total:.1f}%) have another ETS facility within radius")
+    beirle_panel['interfered_20km'] = beirle_panel[fac_id_col].isin(interfered_ids) # type: ignore
     
     return beirle_panel
 
@@ -1130,11 +1121,12 @@ def plot_advection_map(
     print(f"Using {year}-{selected_month:02d}: {wind_speed:.1f} m/s from {cardinal} ({wind_dir_from:.0f} deg)")
     
     # Compute gradient and advection: A = w · ∇V (Beirle Eq. 5)
+    # GEE gradient() returns per-meter spatial derivatives (verified empirically Dec 2024)
     gradient = no2_mean.gradient()
-    dx = gradient.select('x').divide(TROPOMI_SCALE_M)
-    dy = gradient.select('y').divide(TROPOMI_SCALE_M)
+    dx = gradient.select('x')  # [mol/m² per m] = [mol/m³]
+    dy = gradient.select('y')  # [mol/m² per m] = [mol/m³]
     
-    advection = dx.multiply(wind_u).add(dy.multiply(wind_v))
+    advection = dx.multiply(wind_u).add(dy.multiply(wind_v))  # [mol/(m²·s)]
     
     # Integration disc for clipping
     disc = _build_integration_disc(lon, lat, INTEGRATION_RADIUS_M * 1.5)

@@ -36,7 +36,8 @@ def estimate_twfe(
     cluster_col: str = _DEFAULT_CLUSTER_COL,
     id_col: str = _DEFAULT_FAC_ID_COL,
     time_col: str = _DEFAULT_YEAR_COL,
-    region_col: Optional[str] = None
+    region_col: Optional[str] = None,
+    weight_col: Optional[str] = None
 ) -> Dict:
     """
     Estimate TWFE with continuous treatment.
@@ -61,13 +62,13 @@ def estimate_twfe(
         Time period
     region_col : str, optional
         Region column for Region×Year FE (defaults to cluster_col)
+    weight_col : str, optional
+        Column containing observation weights (e.g., inverse-variance weights)
     
     Returns
     -------
     Dict with coefficient, SE, p-value, CI, and model details
     """
-    if not HAS_PYFIXEST:
-        raise ImportError("pyfixest required. Install: pip install pyfixest")
     
     df = df.copy()
     df = df.dropna(subset=[outcome_col, treatment_col])
@@ -90,9 +91,14 @@ def estimate_twfe(
     print(f"\n{spec_name}")
     print(f"  Formula: {formula}")
     print(f"  Cluster: {cluster_col}")
+    if weight_col:
+        print(f"  Weights: {weight_col}")
     
-    # Estimate with pyfixest
-    model = pf.feols(formula, data=df, vcov={"CRV1": cluster_col})
+    # Estimate with pyfixest (with optional weights)
+    if weight_col and weight_col in df.columns:
+        model = pf.feols(formula, data=df, vcov={"CRV1": cluster_col}, weights=weight_col)  # type: ignore
+    else:
+        model = pf.feols(formula, data=df, vcov={"CRV1": cluster_col})
     
     # Extract results
     coef = model.coef().get(treatment_col, np.nan)
@@ -104,10 +110,10 @@ def estimate_twfe(
         "coefficient": coef,
         "se": se,
         "pvalue": pval,
-        "ci_lower": coef - 1.96 * se,
-        "ci_upper": coef + 1.96 * se,
-        "n_obs": model.nobs,
-        "r2": model.r2,
+        "ci_lower": coef - 1.96 * se, # type: ignore
+        "ci_upper": coef + 1.96 * se, # type: ignore
+        "n_obs": model.nobs, # type: ignore
+        "r2": model.r2, # type: ignore
         "formula": formula,
         "cluster_col": cluster_col,
         "treatment_col": treatment_col,
@@ -261,7 +267,7 @@ def run_outcome_models(
     cluster_col : str
         Column for clustered SEs (NUTS2 region)
     weight_col : str, optional
-        Weights column (not yet implemented)
+        Column containing observation weights (e.g., inverse-variance weights for satellite NOx)
     label : str, optional
         Label for output (defaults to outcome_col)
     
@@ -280,16 +286,18 @@ def run_outcome_models(
     # Filter to valid observations
     df_valid = df.dropna(subset=[outcome_col, treatment_col])
     
-    if weight_col:
-        print(f"  Note: Inverse-variance weighting not yet implemented.")
+    # Also filter by weights if using weighted estimation
+    if weight_col and weight_col in df_valid.columns:
+        df_valid = df_valid.dropna(subset=[weight_col])
     
-    # Run TWFE
+    # Run TWFE (with optional weights)
     results = run_twfe(
         df_valid,
         treatment_col=treatment_col,
         outcome_col=outcome_col,
         controls=controls,
-        cluster_col=cluster_col
+        cluster_col=cluster_col,
+        weight_col=weight_col if weight_col and weight_col in df_valid.columns else None
     )
     
     # Add metadata
@@ -313,18 +321,55 @@ def run_dual_outcome_analysis(
     cluster_col: str = _DEFAULT_CLUSTER_COL,
     ets_col: str = "log_ets_co2",
     nox_col: str = "beirle_nox_kg_s",
-    nox_se_col: Optional[str] = "beirle_nox_kg_s_se"
+    nox_se_col: str = "beirle_nox_kg_s_se",
+    nox_days_control: bool = False,
+    nox_days_col: str = "n_days_satellite",
+    nox_embeddings: bool = True,
+    nox_weight_col: Optional[str] = "nox_weight",
+    embedding_reduction: Optional[str] = None,
+    embedding_n_components: int = 10,
+    embedding_prefix: str = "emb_"
 ) -> Dict[str, Dict]:
     """
     Run TWFE for both ETS CO2 and Satellite NOx outcomes.
     
     Uses single specification: Facility + Region×Year FE with clustered SEs.
+    
+    Parameters
+    ----------
+    controls : list
+        Base controls (e.g., capacity, fuel shares) applied to BOTH outcomes.
+    nox_days_control : bool
+        If True, add n_days_satellite and nox_se_col as controls for NOx outcome.
+    nox_days_col : str
+        Column name for satellite observation day count.
+    nox_embeddings : bool
+        If True (default), add AlphaEarth embeddings as controls for NOx
+        outcome ONLY. Embeddings control for satellite retrieval heterogeneity
+        (terrain, land use, climate) but are irrelevant for ETS CO₂ (administrative).
+    nox_weight_col : str, optional
+        Column containing inverse-variance weights for NOx outcome (default: 'nox_weight').
+        Set to None to disable weighting.
+    embedding_reduction : str, optional
+        Dimensionality reduction for embeddings: 'pca' (unsupervised) or 'pls' 
+        (facility-level supervised). If None (default), uses raw 64-dim embeddings.
+        PLS is trained on facility-level mean NOx to prevent outcome snooping.
+        See Chernozhukov et al. (2018) on regularization bias.
+    embedding_n_components : int
+        Number of components for reduced embeddings (default: 10).
+    embedding_prefix : str
+        Prefix for raw embedding columns (default: 'emb_').
     """
     results = {}
     
-    # ETS CO2 (ground truth)
+    # ==========================================================================
+    # ETS CO2 (ground truth) - NO EMBEDDINGS
+    # Geographic confounders absorbed by Facility FE (time-invariant) and
+    # Region×Year FE (time-varying). Embeddings would control for nothing relevant.
+    # ==========================================================================
     print("\n" + "=" * 70)
     print("ETS VERIFIED CO2 EMISSIONS (GROUND TRUTH)")
+    print("  Controls: base only (embeddings NOT used - absorbed by FE)")
     print("=" * 70)
     results["ets"] = run_outcome_models(
         df, outcome_col=ets_col, treatment_col=treatment_col,
@@ -332,13 +377,76 @@ def run_dual_outcome_analysis(
         label="ETS CO2 (tCO2/yr, log)"
     )
     
-    # Satellite NOx
+    # ==========================================================================
+    # Satellite NOx - WITH EMBEDDINGS (for retrieval context)
+    # Embeddings control for systematic measurement heterogeneity:
+    # - Terrain affects AMF corrections
+    # - Land use affects urban background NO₂
+    # - Climate affects wind patterns and NOx lifetime
+    # ==========================================================================
+    nox_controls = list(controls) if controls else []
+    
+    # Add observation coverage controls
+    if nox_days_control:
+        if nox_days_col in df.columns:
+            nox_controls.append(nox_days_col)
+        if nox_se_col in df.columns:
+            nox_controls.append(nox_se_col)
+    
+    # Add AlphaEarth embeddings for satellite retrieval context
+    n_emb_added = 0
+    emb_method_desc = ""
+    if nox_embeddings:
+        raw_emb_cols = [c for c in df.columns if c.startswith(embedding_prefix)]
+        
+        if raw_emb_cols:
+            # Check how many NOx obs have valid embeddings
+            nox_valid = df[nox_col].notna()
+            emb_valid = df[raw_emb_cols[0]].notna()
+            n_both = (nox_valid & emb_valid).sum()
+            
+            if n_both > 0:
+                if embedding_reduction is not None:
+                    # Apply dimensionality reduction
+                    from embedding_reduction import reduce_embeddings, get_reduced_embedding_cols
+                    
+                    df = reduce_embeddings(
+                        df, 
+                        method=embedding_reduction,
+                        n_components=embedding_n_components,
+                        target_col=nox_col if embedding_reduction == "pls" else None,
+                        emb_prefix=embedding_prefix
+                    )
+                    emb_cols = get_reduced_embedding_cols(df, method=embedding_reduction)
+                    emb_method_desc = f"{embedding_reduction.upper()} ({embedding_n_components} dims)"
+                else:
+                    # Use raw embeddings
+                    emb_cols = raw_emb_cols
+                    emb_method_desc = f"raw ({len(raw_emb_cols)} dims)"
+                
+                nox_controls.extend(emb_cols)
+                n_emb_added = len(emb_cols)
+    
+    # Check if weights are available
+    use_weights = nox_weight_col and nox_weight_col in df.columns
+    
     print("\n" + "=" * 70)
     print("SATELLITE NOx EMISSION PROXY (BEIRLE-STYLE)")
+    if emb_method_desc:
+        print(f"  Controls: base + embeddings {emb_method_desc}")
+    else:
+        print(f"  Controls: base only (no embeddings)")
+    if nox_days_control:
+        print(f"  + observation coverage controls ({nox_days_col})")
+    if use_weights:
+        print(f"  Weights: inverse-variance ({nox_weight_col})")
     print("=" * 70)
+    
     results["satellite"] = run_outcome_models(
         df, outcome_col=nox_col, treatment_col=treatment_col,
-        controls=controls, cluster_col=cluster_col,
+        controls=nox_controls if nox_controls else None,
+        cluster_col=cluster_col,
+        weight_col=nox_weight_col if use_weights else None,
         label="Satellite NOx (kg/s)"
     )
     

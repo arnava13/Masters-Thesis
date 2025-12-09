@@ -145,7 +145,29 @@
   doi       = "10.1016/j.apr.2020.07.019"
 }
 
-%% EU ETS Policy
+%% EU ETS Policy and Legal Framework
+@legislation{euets2003directive,
+  author    = "{European Parliament and Council}",
+  title     = "Directive 2003/87/{EC} establishing a scheme for greenhouse gas emission allowance trading within the {Community}",
+  year      = "2003",
+  number    = "2003/87/EC",
+  journal   = "Official Journal of the European Union",
+  volume    = "L 275",
+  pages     = "32--46",
+  url       = "https://eur-lex.europa.eu/eli/dir/2003/87/oj",
+  note      = "Annex I defines activity codes: Code 1 (Phases 1--2) = `Combustion installations with rated thermal input exceeding 20 MW'; Code 20 (Phase 3+) = `Combustion of fuels'. Consolidated version at \url{https://eur-lex.europa.eu/eli/dir/2003/87/2024-03-01}"
+}
+
+@techreport{eea2021etsbackground,
+  author       = "{European Environment Agency}",
+  title        = "{EU ETS} Data Viewer: User Manual and Background Note",
+  institution  = "European Environment Agency",
+  year         = "2021",
+  type         = "Technical Document",
+  url          = "https://www.eea.europa.eu/data-and-maps/data/european-union-emissions-trading-scheme-12/eu-ets-background-note",
+  note         = "Table 6-1 provides activity codes used in EUTL database; codes 1, 20 identify combustion/electricity sector installations"
+}
+
 @book{ellerman2016,
   author    = "Ellerman, A. Denny and Marcantonini, Claudio and Zaklan, Aleksandar",
   title     = "The {E}uropean {U}nion {E}missions {T}rading {S}ystem: Ten Years and Counting",
@@ -155,6 +177,16 @@
   pages     = "89--107",
   year      = "2016",
   doi       = "10.1093/reep/rev014"
+}
+
+@misc{ecets2023revision,
+  author    = "{European Commission}",
+  title     = "{ETS} Revision: No Change to Deadline to Surrender Allowances in 2023",
+  year      = "2023",
+  month     = "January",
+  howpublished = "Directorate-General for Climate Action",
+  url       = "https://climate.ec.europa.eu/news-your-voice/news/ets-revision-no-change-deadline-surrender-allowances-2023-2023-01-30_en",
+  note      = "Accessed December 2024. Confirms compliance calendar: free allocation by 28 February, surrender by 30 April"
 }
 
 %% Causal Inference with Embeddings and High-Dimensional Controls
@@ -184,7 +216,17 @@
   number    = "1",
   pages     = "C1--C68",
   year      = "2018",
-  doi       = "10.1111/ectj.12097"
+  doi       = "10.1111/ectj.12097",
+  note      = "Key reference for regularization bias in ML-based causal inference and sample-splitting strategies"
+}
+
+@article{cinelli2022,
+  author    = "Cinelli, Carlos and Forney, Andrew and Pearl, Judea",
+  title     = "A Crash Course in Good and Bad Controls",
+  journal   = "Sociological Methods \& Research",
+  year      = "2022",
+  doi       = "10.1177/00491241221099552",
+  note      = "Defines bad controls as variables that, when conditioned on, introduce bias. Relevant to supervised dimensionality reduction where outcome information leaks into covariates."
 }
 
 @article{kojevnikov2023,

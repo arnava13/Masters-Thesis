@@ -6,6 +6,12 @@ Contains:
 - normalize_pyeutl_id: Normalizes pyeutl installation IDs
 - normalize_eureg_id: Normalizes EU Registry ETS identifiers
 - build_eu_ets_yearly_from_zip: Builds yearly ETS metrics from zip file
+- get_installation_activity_info: Extracts activity sector info from installations
+
+EU ETS Activity Codes (from activity_type.csv in EUETS.INFO data):
+- 1: Combustion installations (>20 MW thermal) - Phase 1-2
+- 20: Combustion of fuels - Phase 3+
+These indicate electricity/heat generators.
 """
 
 import re
@@ -70,6 +76,21 @@ def normalize_eureg_id(x) -> str | None:
     return None
 
 
+# EU ETS Activity codes for combustion installations
+# Source: Directive 2003/87/EC Annex I (as amended)
+#   https://eur-lex.europa.eu/eli/dir/2003/87/2024-03-01
+# See also: EEA EU ETS Data Viewer Background Note, Table 6-1
+#   https://www.eea.europa.eu/data-and-maps/data/european-union-emissions-trading-scheme-12/eu-ets-background-note
+ELECTRICITY_ACTIVITY_CODES = {1, 20}
+# Code 1 (Phases 1-2, 2005-2012): "Combustion installations with a rated thermal input exceeding 20 MW"
+# Code 20 (Phase 3+, 2013-present): "Combustion of fuels" - covers same installations under revised Annex I
+#
+# NOTE: These codes identify combustion installations broadly (power plants, CHP, industrial boilers,
+# district heating), not electricity generators specifically. However, for the LCP (Large Combustion
+# Plant) dataset used in this study, the registry primarily covers electricity-generating facilities,
+# so this approximation effectively identifies the electricity sector for PyPSA-Eur cluster assignment.
+
+
 def build_eu_ets_yearly_from_zip(
     fn_zip: str,
     fac_static,
@@ -78,7 +99,7 @@ def build_eu_ets_yearly_from_zip(
     end_year: int = 2023,
     alloc_ratio_min: float = 0.01,
     alloc_ratio_max: float = 20.0,
-) -> tuple[pd.DataFrame, dict]:
+) -> tuple[pd.DataFrame, dict, dict]:
     """
     Build yearly EU ETS metrics aggregated at the facility level.
     Uses normalized ID matching between EU Registry ETS IDs and pyeutl installation IDs.
@@ -93,7 +114,12 @@ def build_eu_ets_yearly_from_zip(
         alloc_ratio_max: Maximum allocation ratio to keep (default: 20.0)
     
     Returns:
-        Tuple of (yearly_panel DataFrame, matched_ets_ids dict mapping facility idx -> list of matched NORMALIZED ETS IDs)
+        Tuple of:
+        - yearly_panel DataFrame
+        - matched_ets_ids dict mapping facility idx -> list of matched NORMALIZED ETS IDs
+        - facility_activity dict mapping facility idx -> dict with activity info:
+            - 'activity_ids': set of activity codes for matched installations
+            - 'is_electricity': True if any matched installation is combustion (activity_id in {1, 20})
     """
     df_inst = get_installations(fn_zip)
     df_comp = get_compliance(fn_zip, df_installation=df_inst)
@@ -152,7 +178,7 @@ def build_eu_ets_yearly_from_zip(
     
     if matched.empty:
         print("No matches found!")
-        return pd.DataFrame(), {}
+        return pd.DataFrame(), {}, {}
     
     # Track which normalised ETS IDs actually matched (for updating facilities_static)
     matched_ets_ids_per_fac = (
@@ -160,6 +186,33 @@ def build_eu_ets_yearly_from_zip(
         .apply(lambda x: list(x.unique()))
         .to_dict()
     )
+    
+    # --- Extract activity info for heterogeneity analysis ---
+    # Get activity_id from installation data
+    if "activity_id" in df_inst.columns:
+        inst_activity = df_inst.set_index("id")["activity_id"].to_dict()
+        matched["activity_id"] = matched["installation_id"].map(inst_activity)
+        
+        # Aggregate activity info per facility
+        def agg_activity(g):
+            activity_ids = set(g["activity_id"].dropna().astype(int))
+            is_electricity = bool(activity_ids & ELECTRICITY_ACTIVITY_CODES)
+            return pd.Series({
+                "activity_ids": activity_ids,
+                "is_electricity": is_electricity
+            })
+        
+        facility_activity = (
+            matched.groupby(fac_id_col)
+            .apply(agg_activity, include_groups=False)
+            .to_dict(orient="index")
+        )
+        
+        n_electricity = sum(1 for v in facility_activity.values() if v["is_electricity"])
+        print(f"Activity info: {n_electricity:,} facilities are electricity generators (activity_id in {ELECTRICITY_ACTIVITY_CODES})")
+    else:
+        print("Warning: activity_id column not found in installation data")
+        facility_activity = {}
     
     # Deduplicate to ensure each installation is counted once per 
     # facility-year, as multiple ETS IDs may normalise to the same one
@@ -212,4 +265,4 @@ def build_eu_ets_yearly_from_zip(
     keep_cols = [fac_id_col, "year", "n_installations",
                  "eu_verified_tco2", "eu_alloc_total_tco2",
                  "eu_surrendered_tco2", "eu_shortfall_tco2", "eu_alloc_ratio"]
-    return out[keep_cols].sort_values([fac_id_col, "year"]), matched_ets_ids_per_fac
+    return out[keep_cols].sort_values([fac_id_col, "year"]), matched_ets_ids_per_fac, facility_activity

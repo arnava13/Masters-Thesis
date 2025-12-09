@@ -19,8 +19,9 @@ Treatment definition:
 import pandas as pd
 import numpy as np
 from typing import Optional, Dict, Tuple
-import warnings
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import Figure # type: ignore
+import csdid
 
 # Default values (can be overridden via function parameters)
 FAC_ID_COL = "idx"
@@ -29,18 +30,6 @@ CLUSTER_COL = "nuts2_region"
 CS_ANTICIPATION = 0
 CS_CONTROL_GROUP = "nevertreated"
 CS_EST_METHOD = "dr"
-
-# Import csdid
-try:
-    import csdid
-    HAS_CSDID = True
-except ImportError:
-    HAS_CSDID = False
-    warnings.warn(
-        "csdid not installed. Install with: pip install csdid\n"
-        "Reference: https://github.com/d2cml-ai/csdid"
-    )
-
 
 # =============================================================================
 # Cohort Construction
@@ -78,8 +67,8 @@ def build_cohorts(
         df[df[treatment_col] == 1]
         .groupby(id_col)[time_col]
         .min()
-        .rename(cohort_col)
-    )
+        .rename(cohort_col) # type: ignore
+    ) # type: ignore
     
     # Merge back
     if cohort_col in df.columns:
@@ -118,13 +107,13 @@ def validate_cohorts(
     n_cohorts = (cohort_counts.index > 0).sum()
     
     results["cohort_summary"] = {
-        "n_never_treated": int(n_never_treated),
+        "n_never_treated": int(n_never_treated), # type: ignore
         "n_ever_treated": int(n_ever_treated),
         "n_cohorts": int(n_cohorts),
         "cohort_sizes": cohort_counts.to_dict()
     }
     
-    if n_never_treated < 10:
+    if n_never_treated < 10: # type: ignore
         results["warnings"].append(
             f"Only {n_never_treated} never-treated. Consider 'notyettreated' control."
         )
@@ -188,8 +177,6 @@ def estimate_callaway_santanna(
     -------
     Dict with att_gt, aggregations, and metadata
     """
-    if not HAS_CSDID:
-        raise ImportError("csdid not installed. Run: pip install csdid")
     
     df = df.copy()
     
@@ -209,7 +196,7 @@ def estimate_callaway_santanna(
     
     # Estimate ATT(g,t)
     # Note: csdid clustervars syntax may vary by version
-    att_gt_result = csdid.att_gt(
+    att_gt_result = csdid.att_gt( # type: ignore
         data=df,
         yname=outcome_col,
         gname=cohort_col,
@@ -222,13 +209,13 @@ def estimate_callaway_santanna(
     )
     
     # Aggregate: simple (overall ATT)
-    agg_simple = csdid.aggte(att_gt_result, type="simple")
+    agg_simple = csdid.aggte(att_gt_result, type="simple") # type: ignore
     
     # Aggregate: dynamic (event study)
-    agg_dynamic = csdid.aggte(att_gt_result, type="dynamic")
+    agg_dynamic = csdid.aggte(att_gt_result, type="dynamic") #type: ignore
     
     # Aggregate: by cohort
-    agg_group = csdid.aggte(att_gt_result, type="group")
+    agg_group = csdid.aggte(att_gt_result, type="group") #type: ignore
     
     # Extract results
     results = {
@@ -245,7 +232,7 @@ def estimate_callaway_santanna(
         "agg_group": agg_group,
         "n_obs": len(df),
         "n_units": df[id_col].nunique(),
-        "n_cohorts": df[df[cohort_col] > 0][cohort_col].nunique(),
+        "n_cohorts": df[df[cohort_col] > 0][cohort_col].nunique(), # type: ignore
         "outcome": outcome_col,
         "cluster_col": cluster_col
     }
@@ -325,7 +312,7 @@ def plot_event_study(
     figsize: Tuple[int, int] = (10, 6),
     max_pre: int = 3,
     max_post: int = 4
-) -> plt.Figure:
+) -> Figure:
     """
     Plot event study from CS-DiD results.
     """

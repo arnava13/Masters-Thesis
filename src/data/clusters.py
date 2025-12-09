@@ -287,15 +287,15 @@ def assign_pypsa_clusters(
     # Spatial join: which region contains each facility?
     joined = gpd.sjoin(facilities_gdf, regions, how="left", predicate="within")
     
-    # Extract cluster ID (use 'name' or 'index_right' depending on geojson structure)
+    # Extract cluster ID - prefer 'name' column for readable cluster IDs
     if "name" in joined.columns:
-        cluster_ids = joined.set_index(id_col)["name"]
+        cluster_ids = joined.set_index(id_col)["name"].astype(str)
     elif "index_right" in joined.columns:
-        cluster_ids = joined.set_index(id_col)["index_right"]
+        cluster_ids = joined.set_index(id_col)["index_right"].astype(str)
     else:
         # Use first non-geometry column from regions
         region_cols = [c for c in regions.columns if c != "geometry"]
-        cluster_ids = joined.set_index(id_col)[region_cols[0]]
+        cluster_ids = joined.set_index(id_col)[region_cols[0]].astype(str)
     
     # Map to panel
     panel = panel.copy()
@@ -422,7 +422,13 @@ def assign_clusters_to_static(
                 pypsa_gdf = pypsa_gdf.to_crs(facilities_gdf.crs) # type: ignore
             
             joined = gpd.sjoin(facilities_gdf, pypsa_gdf, how="left", predicate="within") # type: ignore
-            pypsa_id_col = "name" if "name" in joined.columns else "index_right"
+            # Handle column name conflicts from sjoin (name -> name_right if conflict exists)
+            if "name" in joined.columns:
+                pypsa_id_col = "name"
+            elif "name_right" in joined.columns:
+                pypsa_id_col = "name_right"
+            else:
+                pypsa_id_col = "index_right"
             static_df[pypsa_col] = joined[pypsa_id_col].values
             
             n_assigned = static_df[pypsa_col].notna().sum()
