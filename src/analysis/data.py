@@ -13,7 +13,7 @@ Dual Outcomes:
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 
 # Default paths (pass paths explicitly from notebook)
 _DEFAULT_OUT_DIR = Path("out")
@@ -112,8 +112,8 @@ def load_analysis_panel(
     
     # Merge static info into yearly panel
     # Note: urbanization and interference variables are for heterogeneity analysis, not regression controls
-    static_cols = [FAC_ID_COL, "lat", "lon", "country_code", 
-                   URBANIZATION_DEGREE_COL, IN_URBAN_AREA_COL, INTERFERED_20KM_COL]
+    static_cols = [FAC_ID_COL, "lat", "lon", "country_code", "nuts2_region", "pypsa_cluster",
+                   "is_electricity", URBANIZATION_DEGREE_COL, IN_URBAN_AREA_COL, INTERFERED_20KM_COL]
     static_cols = [c for c in static_cols if c in static.columns]
     
     panel = yearly.merge(
@@ -218,6 +218,107 @@ def build_treatment_variables(
     print(f"Cohorts: {len(cohorts)}")
     
     return df
+
+
+def identify_treatment_reversers(
+    df: pd.DataFrame,
+    treatment_col: str = ALLOC_RATIO_COL,
+    threshold: float = 1.0,
+    id_col: str = FAC_ID_COL,
+    time_col: str = YEAR_COL
+) -> pd.DataFrame:
+    """
+    Identify facilities with treatment reversals.
+    
+    A reversal occurs when a facility's treatment status changes from treated
+    to untreated (or vice versa) between consecutive periods. Standard CS-DiD
+    assumes absorbing treatment (once treated, always treated), so reversers
+    violate this assumption.
+    
+    Parameters
+    ----------
+    df : DataFrame
+        Panel data
+    treatment_col : str
+        Treatment intensity column (e.g., eu_alloc_ratio)
+    threshold : float
+        Threshold for binary treatment (treated if < threshold)
+    
+    Returns
+    -------
+    DataFrame with columns: idx, n_reversals, is_reverser
+    """
+    df = df.copy()
+    df["_treated"] = (df[treatment_col] < threshold).astype(int)
+    
+    # Sort by facility and time
+    df = df.sort_values([id_col, time_col])
+    
+    # Count reversals per facility
+    def count_reversals(seq):
+        reversals = 0
+        seq_list = list(seq)
+        for i in range(1, len(seq_list)):
+            if seq_list[i] != seq_list[i-1]:
+                reversals += 1
+        return reversals
+    
+    reversal_counts = (
+        df.groupby(id_col)["_treated"]
+        .apply(count_reversals)
+        .reset_index()
+        .rename(columns={"_treated": "n_reversals"})
+    )
+    reversal_counts["is_reverser"] = reversal_counts["n_reversals"] > 0
+    
+    return reversal_counts
+
+
+def get_absorbing_treatment_sample(
+    df: pd.DataFrame,
+    treatment_col: str = ALLOC_RATIO_COL,
+    threshold: float = 1.0,
+    id_col: str = FAC_ID_COL,
+    time_col: str = YEAR_COL
+) -> pd.DataFrame:
+    """
+    Filter to facilities with absorbing treatment (no reversals).
+    
+    Required for valid Callaway-Sant'Anna estimation, which assumes once
+    treated, always treated. Facilities that switch in/out of treatment
+    are excluded.
+    
+    Parameters
+    ----------
+    df : DataFrame
+        Panel data
+    treatment_col : str
+        Treatment intensity column
+    threshold : float
+        Threshold for binary treatment
+    
+    Returns
+    -------
+    Filtered DataFrame with only non-reversing facilities
+    """
+    reversal_info = identify_treatment_reversers(
+        df, treatment_col, threshold, id_col, time_col
+    )
+    
+    n_total = df[id_col].nunique()
+    non_reversers = reversal_info[~reversal_info["is_reverser"]][id_col]
+    n_keep = len(non_reversers)
+    n_drop = n_total - n_keep
+    
+    df_filtered = df[df[id_col].isin(non_reversers)].copy() # type: ignore
+    
+    print(f"\nAbsorbing treatment filter (CS-DiD requirement):")
+    print(f"  Total facilities: {n_total}")
+    print(f"  Reversers dropped: {n_drop} ({100*n_drop/n_total:.1f}%)")
+    print(f"  Non-reversers kept: {n_keep} ({100*n_keep/n_total:.1f}%)")
+    print(f"  Observations: {len(df)} → {len(df_filtered)}")
+    
+    return df_filtered # type: ignore
 
 
 # =============================================================================
@@ -459,18 +560,17 @@ def apply_satellite_filters(
     return df
 
 
-def get_intersection_sample(
+def get_intersection_samples(
     df: pd.DataFrame,
     ets_col: str = ETS_CO2_COL,
-    nox_col: str = NOX_OUTCOME_COL,
-    satellite_sample: str = "significant",
     exclude_interfered: bool = False
-) -> pd.DataFrame:
+) -> Dict[str, pd.DataFrame]:
     """
-    Get sample with both valid ETS and satellite outcomes.
+    Get intersection samples with both valid ETS and satellite outcomes.
     
-    Useful for comparing treatment effects across outcomes on same sample.
-    Uses the new boolean-flag-based filtering via get_satellite_sample().
+    Returns samples for BOTH detection limits for robustness comparison:
+    - 'permissive' (DL ≥ 0.03 kg/s): larger sample, more noise
+    - 'conservative' (DL ≥ 0.11 kg/s): smaller sample, higher quality signals
     
     Parameters
     ----------
@@ -478,29 +578,53 @@ def get_intersection_sample(
         Panel with both ETS and satellite outcomes
     ets_col : str
         ETS outcome column
-    nox_col : str
-        Satellite NOx outcome column
-    satellite_sample : str
-        "all" or "significant" (passed to get_satellite_sample)
     exclude_interfered : bool
         If True, exclude interfered facilities
     
     Returns
     -------
-    Filtered DataFrame with both outcomes valid
+    Dict with keys 'permissive' (DL 0.03) and 'conservative' (DL 0.11)
     """
-    df = df.copy()
+    results: Dict[str, pd.DataFrame] = {}
     
-    # Require ETS outcome
-    df = df.dropna(subset=[ets_col])
+    # Base: require ETS outcome and non-missing satellite
+    base_df = df.copy()
+    base_df = base_df.dropna(subset=[ets_col])
+    base_df = base_df.dropna(subset=[NOX_OUTCOME_COL])
     
-    # Apply satellite sample filter
-    df = get_satellite_sample(df, sample=satellite_sample, exclude_interfered=exclude_interfered)
+    print("\n" + "=" * 60)
+    print("INTERSECTION SAMPLES (ETS + Satellite)")
+    print("=" * 60)
     
-    n_fac = df[FAC_ID_COL].nunique()
-    print(f"Intersection sample: {len(df)} obs, {n_fac} facilities")
+    # Permissive: DL ≥ 0.03 kg/s (all valid satellite obs)
+    if DL_PERMISSIVE_COL in base_df.columns:
+        perm_df = base_df[base_df[DL_PERMISSIVE_COL] == True].copy()
+    else:
+        perm_df = base_df.copy()  # If no flag, use all
     
-    return df
+    if exclude_interfered and INTERFERED_20KM_COL in perm_df.columns:
+        perm_df = perm_df[perm_df[INTERFERED_20KM_COL] == False]
+    
+    results["permissive"] = perm_df # type: ignore
+    n_perm = len(perm_df)
+    n_fac_perm = perm_df[FAC_ID_COL].nunique() # type: ignore
+    print(f"  Permissive (DL ≥ 0.03): {n_perm} obs, {n_fac_perm} facilities")
+    
+    # Conservative: DL ≥ 0.11 kg/s (Beirle standard)
+    if DL_CONSERVATIVE_COL in base_df.columns:
+        cons_df = base_df[base_df[DL_CONSERVATIVE_COL] == True].copy()
+    else:
+        cons_df = base_df.copy()
+    
+    if exclude_interfered and INTERFERED_20KM_COL in cons_df.columns:
+        cons_df = cons_df[cons_df[INTERFERED_20KM_COL] == False]
+    
+    results["conservative"] = cons_df # type: ignore
+    n_cons = len(cons_df)
+    n_fac_cons = cons_df[FAC_ID_COL].nunique() # type: ignore
+    print(f"  Conservative (DL ≥ 0.11): {n_cons} obs, {n_fac_cons} facilities")
+    
+    return results
 
 
 def summarize_satellite_flags(df: pd.DataFrame) -> pd.DataFrame:

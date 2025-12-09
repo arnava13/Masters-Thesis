@@ -21,14 +21,14 @@ import numpy as np
 from typing import Optional, Dict, Tuple
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import Figure # type: ignore
-import csdid
+from csdid.att_gt import ATTgt
 
 # Default values (can be overridden via function parameters)
 FAC_ID_COL = "idx"
 YEAR_COL = "year"
 CLUSTER_COL = "nuts2_region"
 CS_ANTICIPATION = 0
-CS_CONTROL_GROUP = "nevertreated"
+CS_CONTROL_GROUP = "notyettreated"
 CS_EST_METHOD = "dr"
 
 # =============================================================================
@@ -144,7 +144,6 @@ def estimate_callaway_santanna(
     xformla: Optional[str] = None,
     control_group: str = CS_CONTROL_GROUP,
     anticipation: int = CS_ANTICIPATION,
-    est_method: str = CS_EST_METHOD,
     cluster_col: Optional[str] = None
 ) -> Dict:
     """
@@ -168,10 +167,8 @@ def estimate_callaway_santanna(
         "nevertreated" or "notyettreated"
     anticipation : int
         Anticipation periods (usually 0)
-    est_method : str
-        "dr" (doubly robust), "ipw", or "reg"
     cluster_col : str, optional
-        Column for clustered SEs (e.g., pypsa_cluster)
+        Column for clustered SEs
     
     Returns
     -------
@@ -188,74 +185,92 @@ def estimate_callaway_santanna(
     # Drop missing outcomes
     df = df.dropna(subset=[outcome_col])
     
+    # Filter out small cohorts (< 10 units) to avoid estimation issues
+    cohort_sizes = df[df[cohort_col] > 0].groupby(cohort_col)[id_col].nunique()
+    small_cohorts = cohort_sizes[cohort_sizes < 10].index.tolist() # type: ignore
+    if small_cohorts:
+        print(f"\n  Dropping small cohorts (<10 units): {small_cohorts}")
+        # Set small cohort units to never-treated (cohort=0) so they join control pool
+        df.loc[df[cohort_col].isin(small_cohorts), cohort_col] = 0
+        remaining_cohorts = df[df[cohort_col] > 0][cohort_col].unique() # type: ignore
+        print(f"  Remaining cohorts: {sorted(remaining_cohorts)}")
+    
     print(f"\nEstimating CS-DiD:")
     print(f"  Outcome: {outcome_col}")
     print(f"  Control group: {control_group}")
-    print(f"  Estimation method: {est_method}")
-    print(f"  Clustered SEs: {cluster_col if cluster_col else 'None (unit-level)'}")
+    print(f"  Covariates: {xformla if xformla else 'None'}")
+    print(f"  N obs: {len(df)}, N units: {df[id_col].nunique()}")
     
-    # Estimate ATT(g,t)
-    # Note: csdid clustervars syntax may vary by version
-    att_gt_result = csdid.att_gt( # type: ignore
-        data=df,
-        yname=outcome_col,
-        gname=cohort_col,
-        tname=time_col,
-        idname=id_col,
-        xformla=xformla,
-        control_group=control_group,
-        anticipation=anticipation,
-        est_method=est_method
-    )
+    # Check we have enough cohorts
+    n_cohorts = df[df[cohort_col] > 0][cohort_col].nunique() # type: ignore
+    if n_cohorts < 1:
+        print("  ERROR: No valid cohorts remaining after filtering")
+        return {"error": "No valid cohorts", "n_obs": len(df)}
+    
+    # Estimate ATT(g,t) with error handling
+    try:
+        att_gt_model = ATTgt(
+            yname=outcome_col,
+            gname=cohort_col,
+            tname=time_col,
+            idname=id_col,
+            xformla=xformla, # type: ignore
+            data=df,
+            control_group=control_group,
+            anticipation=anticipation,
+            clustervar=cluster_col,
+            allow_unbalanced_panel=True
+        ).fit()
+    except Exception as e:
+        print(f"  ERROR: {e}")
+        return {"error": str(e), "n_obs": len(df), "n_units": df[id_col].nunique()}
     
     # Aggregate: simple (overall ATT)
-    agg_simple = csdid.aggte(att_gt_result, type="simple") # type: ignore
+    att_gt_model.aggte("simple")
     
-    # Aggregate: dynamic (event study)
-    agg_dynamic = csdid.aggte(att_gt_result, type="dynamic") #type: ignore
-    
-    # Aggregate: by cohort
-    agg_group = csdid.aggte(att_gt_result, type="group") #type: ignore
+    # Get simple aggregation results from the model's internal state
+    # The aggte method updates the model in place
+    simple_results = att_gt_model.aggte("simple")
     
     # Extract results
     results = {
-        "att_gt": att_gt_result,
+        "att_gt": att_gt_model,
         "agg_simple": {
-            "att": agg_simple.overall_att,
-            "se": agg_simple.overall_se,
+            "att": att_gt_model.att,  # Overall ATT after aggte("simple") # type: ignore
+            "se": att_gt_model.se, # type: ignore
             "ci": (
-                agg_simple.overall_att - 1.96 * agg_simple.overall_se,
-                agg_simple.overall_att + 1.96 * agg_simple.overall_se
+                att_gt_model.att - 1.96 * att_gt_model.se if att_gt_model.att is not None else np.nan, # type: ignore
+                att_gt_model.att + 1.96 * att_gt_model.se if att_gt_model.att is not None else np.nan # type: ignore
             )
         },
-        "agg_dynamic": agg_dynamic,
-        "agg_group": agg_group,
         "n_obs": len(df),
         "n_units": df[id_col].nunique(),
         "n_cohorts": df[df[cohort_col] > 0][cohort_col].nunique(), # type: ignore
-        "outcome": outcome_col,
-        "cluster_col": cluster_col
+        "outcome": outcome_col
     }
     
-    print(f"\nResults:")
-    print(f"  Overall ATT: {results['agg_simple']['att']:.6f}")
-    print(f"  SE: {results['agg_simple']['se']:.6f}")
-    print(f"  95% CI: [{results['agg_simple']['ci'][0]:.6f}, {results['agg_simple']['ci'][1]:.6f}]")
+    att = results['agg_simple']['att']
+    se = results['agg_simple']['se']
+    if att is not None and se is not None:
+        print(f"\nResults:")
+        print(f"  Overall ATT: {att:.6f}")
+        print(f"  SE: {se:.6f}")
+        print(f"  95% CI: [{att - 1.96*se:.6f}, {att + 1.96*se:.6f}]")
+    else:
+        print(f"\nResults: Could not compute ATT")
     
     return results
 
 
-def run_csdid_both_specs(
+def run_csdid_outcome(
     df: pd.DataFrame,
     outcome_col: str,
     cohort_col: str = "cohort",
     cluster_col: str = CLUSTER_COL,
     **kwargs
-) -> Dict[str, Dict]:
+) -> Dict:
     """
-    Run CS-DiD with both clustering specifications:
-    1. Without region clustering (unit-level SEs)
-    2. With region-clustered SEs
+    Run CS-DiD for a single outcome with region-clustered SEs.
     
     Parameters
     ----------
@@ -272,32 +287,165 @@ def run_csdid_both_specs(
     
     Returns
     -------
-    Dict with 'no_cluster' and 'region_cluster' results
+    Dict with CS-DiD results
     """
     print("=" * 60)
     print(f"CS-DiD: {outcome_col}")
     print("=" * 60)
     
-    # Spec 1: No clustering (unit-level)
-    print("\n--- Specification 1: Unit-level SEs ---")
-    results_no_cluster = estimate_callaway_santanna(
-        df, outcome_col, cohort_col,
-        cluster_col=None,
-        **kwargs
-    )
-    
-    # Spec 2: Region-clustered
-    print(f"\n--- Specification 2: {cluster_col}-clustered SEs ---")
-    results_clustered = estimate_callaway_santanna(
+    return estimate_callaway_santanna(
         df, outcome_col, cohort_col,
         cluster_col=cluster_col,
         **kwargs
     )
+
+
+def run_csdid_dual_outcome(
+    df: pd.DataFrame,
+    cohort_col: str = "cohort",
+    cluster_col: str = CLUSTER_COL,
+    ets_col: str = "log_ets_co2",
+    nox_col: str = "beirle_nox_kg_s",
+    nox_dl_col: str = "above_dl_0_03",
+    embedding_n_components: int = 10,
+    embedding_prefix: str = "emb_",
+    **kwargs
+) -> Dict[str, Dict]:
+    """
+    Run CS-DiD for both ETS CO2 and Satellite NOx outcomes.
     
-    return {
-        "no_cluster": results_no_cluster,
-        "region_cluster": results_clustered
-    }
+    - ETS CO₂: Full sample, no embeddings
+    - Satellite NOx: Detection-limit-filtered sample, with PCA and PLS embeddings
+    
+    IMPORTANT: NOx analysis ALWAYS applies detection limit filter.
+    Samples below detection limit are excluded.
+    
+    Parameters
+    ----------
+    df : DataFrame
+        Panel data with cohort assignments
+    cohort_col : str
+        Cohort column (first treatment year, 0 = never treated)
+    cluster_col : str
+        Column for regional clustering
+    ets_col : str
+        ETS CO2 outcome column (log-transformed)
+    nox_col : str
+        Satellite NOx outcome column
+    nox_dl_col : str
+        Detection limit column: 'above_dl_0_03' (permissive) or 'above_dl_0_11' (conservative)
+    embedding_n_components : int
+        Number of components for reduced embeddings (default: 10)
+    embedding_prefix : str
+        Prefix for raw embedding columns (default: 'emb_')
+    **kwargs
+        Additional arguments passed to estimate_callaway_santanna
+    
+    Returns
+    -------
+    Dict with keys: 'ets', 'satellite_pca', 'satellite_pls'
+    """
+    from embedding_reduction import reduce_embeddings, get_reduced_embedding_cols
+    
+    results = {}
+    
+    # ==========================================================================
+    # ETS CO2 (ground truth) - FULL SAMPLE, NO EMBEDDINGS
+    # ==========================================================================
+    print("\n" + "=" * 70)
+    print("CS-DiD: ETS VERIFIED CO2 EMISSIONS (GROUND TRUTH)")
+    print("  Sample: Full ETS panel")
+    print("  Covariates: none (DR estimator uses outcome regression)")
+    print("=" * 70)
+    
+    results["ets"] = estimate_callaway_santanna(
+        df, ets_col, cohort_col,
+        cluster_col=cluster_col,
+        **kwargs
+    )
+    
+    # ==========================================================================
+    # Satellite NOx - DETECTION-LIMIT FILTERED, WITH EMBEDDINGS
+    # NOx analysis NEVER uses unfiltered samples
+    # ==========================================================================
+    df_nox = df.copy()
+    n_before = len(df_nox)
+    
+    # Apply detection limit filter (REQUIRED)
+    if nox_dl_col in df_nox.columns:
+        df_nox = df_nox[df_nox[nox_dl_col] == True]
+        dl_label = "≥0.03 kg/s" if "0_03" in nox_dl_col else "≥0.11 kg/s"
+    else:
+        df_nox = df_nox.dropna(subset=[nox_col])
+        dl_label = "non-missing"
+    
+    n_after = len(df_nox)
+    print(f"\nNOx Detection Limit Filter ({dl_label}): {n_before} → {n_after} obs")
+    
+    if n_after < 50:
+        print(f"WARNING: Insufficient NOx observations ({n_after}) after DL filter")
+        return results
+    
+    raw_emb_cols = [c for c in df_nox.columns if c.startswith(embedding_prefix)]
+    has_embeddings = len(raw_emb_cols) > 0
+    
+    for emb_method in ["pca", "pls"]:
+        print("\n" + "=" * 70)
+        print(f"CS-DiD: SATELLITE NOx ({emb_method.upper()}) — Detection Limit: {dl_label}")
+        
+        if has_embeddings:
+            # Apply dimensionality reduction
+            df_reduced = reduce_embeddings(
+                df_nox.copy(), # type: ignore
+                method=emb_method,
+                n_components=embedding_n_components,
+                target_col=nox_col if emb_method == "pls" else None,
+                emb_prefix=embedding_prefix
+            )
+            emb_cols = get_reduced_embedding_cols(df_reduced, method=emb_method)
+            
+            # Build xformla for CS-DiD covariates
+            xformla = "~ " + " + ".join(emb_cols)
+            print(f"  Covariates: {emb_method.upper()} embeddings ({len(emb_cols)} dims)")
+        else:
+            df_reduced = df_nox
+            xformla = None
+            print("  Covariates: none (no embeddings available)")
+        
+        print("=" * 70)
+        
+        results[f"satellite_{emb_method}"] = estimate_callaway_santanna(
+            df_reduced, nox_col, cohort_col, # type: ignore
+            cluster_col=cluster_col,
+            xformla=xformla,
+            **kwargs
+        )
+    
+    return results
+
+
+def format_csdid_results_table(results: Dict[str, Dict]) -> "pd.DataFrame":
+    """
+    Format CS-DiD dual-outcome results as comparison table.
+    """
+    rows = []
+    
+    for outcome_key, outcome_results in results.items():
+        if "agg_simple" not in outcome_results:
+            continue
+        
+        agg = outcome_results["agg_simple"]
+        label = outcome_key.replace("_", " ").title()
+        
+        rows.append({
+            "Outcome": label,
+            "ATT": agg["att"],
+            "SE": agg["se"],
+            "95% CI": f"[{agg['ci'][0]:.4f}, {agg['ci'][1]:.4f}]",
+            "N": outcome_results.get("n_obs", "")
+        })
+    
+    return pd.DataFrame(rows)
 
 
 # =============================================================================

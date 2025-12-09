@@ -484,9 +484,20 @@ def ets_eda(
     plt.show()
 
 
-def beirle_eda(beirle_panel: DataFrame, static_panel: DataFrame, fac_id_col: str = "idx"):
+def beirle_eda(
+    beirle_panel: DataFrame,
+    static_panel: DataFrame,
+    facilities_yearly: Optional[DataFrame] = None,
+    fac_id_col: str = "idx",
+):
     """
     EDA for Beirle-style NOx emission estimates.
+    
+    Args:
+        beirle_panel: Panel with NOx emissions and satellite data
+        static_panel: Static facility attributes (country_code, etc.)
+        facilities_yearly: Optional yearly panel with ETS data for correlation plot
+        fac_id_col: Facility ID column name
     
     Key variables:
     - beirle_nox_kg_s: NOx emission rate (kg/s)
@@ -618,5 +629,66 @@ def beirle_eda(beirle_panel: DataFrame, static_panel: DataFrame, fac_id_col: str
     ax.set_title('Distribution of Mean NOx Emissions by Country')
     ax.tick_params(axis='x', rotation=45)
     ax.legend()
+    plt.tight_layout()
+    plt.show()
+    
+    # -------------------------------------------------------------------------
+    # 5. ETS CO₂ vs NOx Correlation
+    # -------------------------------------------------------------------------
+    print("\n" + "-"*40)
+    print("5. ETS Verified CO₂ vs NOx Correlation")
+    print("-"*40)
+    
+    # Merge ETS data if yearly panel provided
+    if facilities_yearly is not None and 'eu_verified_tco2' in facilities_yearly.columns:
+        df_merged = df.merge(
+            facilities_yearly[[fac_id_col, 'year', 'eu_verified_tco2']],
+            on=[fac_id_col, 'year'],
+            how='left'
+        )
+    elif 'eu_verified_tco2' in df.columns:
+        df_merged = df
+    else:
+        print("ETS data not available. Pass facilities_yearly with eu_verified_tco2 column.")
+        return
+    
+    # Filter to valid observations
+    plot_df = df_merged[['beirle_nox_kg_s', 'eu_verified_tco2']].dropna()
+    
+    if len(plot_df) < 10:
+        print(f"Insufficient data for correlation (n={len(plot_df)})")
+        return
+    
+    # Compute correlation
+    corr = plot_df['beirle_nox_kg_s'].corr(plot_df['eu_verified_tco2']) # type: ignore
+    log_corr = np.log10(plot_df['beirle_nox_kg_s'].clip(lower=1e-6)).corr( # type: ignore
+        np.log10(plot_df['eu_verified_tco2'].clip(lower=1)) # type: ignore
+    )
+    print(f"Pearson correlation (levels): {corr:.3f}")
+    print(f"Pearson correlation (log-log): {log_corr:.3f}")
+    print(f"N observations: {len(plot_df):,}")
+    
+    # Scatterplot
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    
+    # Levels
+    ax = axes[0]
+    ax.scatter(plot_df['eu_verified_tco2'] / 1e6, plot_df['beirle_nox_kg_s'],
+               alpha=0.4, s=20, color='steelblue', edgecolor='none')
+    ax.set_xlabel('Verified ETS CO₂ (MtCO₂/yr)')
+    ax.set_ylabel('Satellite NOx (kg/s)')
+    ax.set_title(f'ETS CO₂ vs NOx Emissions (r = {corr:.3f})')
+    ax.grid(alpha=0.3)
+    
+    # Log-log
+    ax = axes[1]
+    ax.scatter(np.log10(plot_df['eu_verified_tco2'].clip(lower=1)), # type: ignore
+               np.log10(plot_df['beirle_nox_kg_s'].clip(lower=1e-6)), # type: ignore
+               alpha=0.4, s=20, color='steelblue', edgecolor='none')
+    ax.set_xlabel('log₁₀(Verified ETS CO₂)')
+    ax.set_ylabel('log₁₀(Satellite NOx)')
+    ax.set_title(f'Log-Log Scale (r = {log_corr:.3f})')
+    ax.grid(alpha=0.3)
+    
     plt.tight_layout()
     plt.show()

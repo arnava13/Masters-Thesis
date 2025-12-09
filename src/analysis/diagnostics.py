@@ -11,6 +11,7 @@ import numpy as np
 from typing import Optional, List, Dict, Tuple
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import Figure # type: ignore
+from continuous import run_outcome_models
 
 # Default values (can be overridden via function parameters)
 FAC_ID_COL = "idx"
@@ -18,10 +19,13 @@ YEAR_COL = "year"
 TREATMENT_COL = "eu_alloc_ratio"
 TREATMENT_DISCRETE_COL = "treated"
 OUTCOME_COL = "log_ets_co2"
+CLUSTER_COL = "nuts2_region"
 COHORT_COL = "cohort"
 FIGURE_SIZE = (10, 6)
 FIGURE_DPI = 100
 COLOR_PALETTE = "colorblind"
+LOG_ETS_CO2_COL = "log_ets_co2"
+CONTROLS = ["capacity_mw", "share_coal", "share_gas", "share_oil", "share_other_gas"]
 
 
 # =============================================================================
@@ -195,132 +199,8 @@ def plot_treatment_timing(
     plt.tight_layout()
     return fig
 
-
 # =============================================================================
-# 3. Covariate Balance
-# =============================================================================
-
-def compute_covariate_balance(
-    df: pd.DataFrame,
-    treatment_col: str = TREATMENT_DISCRETE_COL,
-    covariates: Optional[List[str]] = None,
-    baseline_only: bool = True
-) -> pd.DataFrame:
-    """
-    Compute covariate balance between treated and control groups.
-    
-    Reports standardized mean differences (SMD) and t-test p-values.
-    
-    Parameters:
-        df: Panel DataFrame
-        treatment_col: Binary treatment indicator
-        covariates: List of covariate columns
-        baseline_only: If True, use only pre-treatment observations
-    
-    Returns:
-        DataFrame with balance statistics
-    """
-    if covariates is None:
-        covariates = ["capacity_mw", "share_coal", "share_gas", "share_oil",
-                      "share_biomass", "eu_verified_tco2"]
-    
-    covariates = [c for c in covariates if c in df.columns]
-    
-    if baseline_only and COHORT_COL in df.columns:
-        # Use only pre-treatment observations
-        df = df[(df[COHORT_COL] == 0) | (df[YEAR_COL] < df[COHORT_COL])] # type: ignore
-    
-    # Ever-treated indicator (facility level)
-    ever_treated = df.groupby(FAC_ID_COL)[treatment_col].max()
-    df = df.merge(ever_treated.rename("ever_treated"), on=FAC_ID_COL, how="left") # type: ignore
-    
-    # Compute means by group
-    treated = df[df["ever_treated"] == 1]
-    control = df[df["ever_treated"] == 0]
-    
-    results = []
-    for cov in covariates:
-        t_mean = treated[cov].mean()
-        c_mean = control[cov].mean()
-        t_std = treated[cov].std()
-        c_std = control[cov].std()
-        
-        # Standardized mean difference
-        pooled_std = np.sqrt((t_std**2 + c_std**2) / 2)
-        smd = (t_mean - c_mean) / pooled_std if pooled_std > 0 else 0
-        
-        # T-test
-        from scipy import stats
-        t_stat, p_val = stats.ttest_ind(
-            treated[cov].dropna(), # type: ignore
-            control[cov].dropna(), # type: ignore
-            equal_var=False
-        )
-        
-        results.append({
-            "covariate": cov,
-            "treated_mean": t_mean,
-            "control_mean": c_mean,
-            "difference": t_mean - c_mean,
-            "smd": smd,
-            "abs_smd": abs(smd),
-            "p_value": p_val
-        })
-    
-    balance_df = pd.DataFrame(results)
-    balance_df = balance_df.sort_values("abs_smd", ascending=False)
-    
-    # Summary
-    n_imbalanced = (balance_df["abs_smd"] > 0.1).sum()
-    print(f"Covariate balance check:")
-    print(f"  Treated: {len(treated):,} obs, Control: {len(control):,} obs")
-    print(f"  Covariates with |SMD| > 0.1: {n_imbalanced}/{len(covariates)}")
-    
-    return balance_df
-
-
-def plot_covariate_balance(
-    balance_df: pd.DataFrame,
-    threshold: float = 0.1,
-    figsize: Tuple[int, int] = (8, 6)
-) -> Figure:
-    """
-    Love plot showing covariate balance (SMD).
-    """
-    fig, ax = plt.subplots(figsize=figsize, dpi=FIGURE_DPI)
-    
-    # Sort by absolute SMD
-    df = balance_df.sort_values("abs_smd", ascending=True)
-    
-    # Colors based on threshold
-    colors = ["green" if abs(s) <= threshold else "red" for s in df["smd"]]
-    
-    # Plot
-    y_pos = range(len(df))
-    ax.barh(y_pos, df["smd"], color=colors, alpha=0.7, edgecolor="white")
-    
-    # Reference lines
-    ax.axvline(0, color="black", linewidth=1)
-    ax.axvline(-threshold, color="gray", linestyle="--", alpha=0.5)
-    ax.axvline(threshold, color="gray", linestyle="--", alpha=0.5)
-    
-    # Labels
-    ax.set_yticks(y_pos)
-    ax.set_yticklabels(df["covariate"])
-    ax.set_xlabel("Standardized Mean Difference", fontsize=11)
-    ax.set_title("Covariate Balance: Treated vs Control", fontsize=12, fontweight="bold")
-    
-    # Threshold annotation
-    ax.annotate(f"|SMD| = {threshold}", xy=(threshold, len(df)-1), 
-                xytext=(threshold + 0.05, len(df)-0.5), fontsize=9, alpha=0.7)
-    
-    ax.grid(True, axis="x", alpha=0.3)
-    plt.tight_layout()
-    return fig
-
-
-# =============================================================================
-# 4. Outcome Visualization
+# 3. Outcome Visualization
 # =============================================================================
 
 def plot_outcome_trends(
@@ -412,6 +292,8 @@ def plot_treatment_outcome_scatter(
     return fig
 
 
+
+
 # =============================================================================
 # 5. Results Summary
 # =============================================================================
@@ -454,3 +336,347 @@ def summarize_estimation_results(
         print(f"Clustering:  {results['cluster_col']}")
     
     print(f"{'='*60}\n")
+
+
+# =============================================================================
+# 6. Heterogeneity Analysis
+# =============================================================================
+
+def run_heterogeneity_analysis(
+    panel: pd.DataFrame,
+    outcome_col: str,
+    treatment_col: str = TREATMENT_COL,
+    controls: List[str] = [], 
+    cluster_col: str = CLUSTER_COL,
+    id_col: str = FAC_ID_COL,
+    electricity_col: str = "is_electricity",
+    urban_col: str = "in_urban_area",
+    min_obs: int = 20,
+    min_facilities: int = 5
+) -> pd.DataFrame:
+    """
+    Run heterogeneity analysis across multiple dimensions for a single outcome.
+    
+    Parameters
+    ----------
+    panel : DataFrame
+        Panel data with outcome, treatment, and split variables
+    outcome_col : str
+        Outcome variable column name
+    treatment_col : str
+        Treatment variable column name
+    controls : List[str]
+        Control variables (include embeddings if applicable)
+    cluster_col : str
+        Clustering column for SEs
+    electricity_col : str
+        Column for electricity sector split
+    urban_col : str
+        Column for urban/rural split
+    min_obs : int
+        Minimum observations required per subsample
+    min_facilities : int
+        Minimum facilities required per subsample
+        
+    Returns
+    -------
+    DataFrame with heterogeneity results
+    """
+    if controls is None:
+        controls = CONTROLS
+    
+    rows = []
+    
+    def add_row(dimension, group, res):
+        if res and "coefficient" in res:
+            pval = res["pvalue"]
+            rows.append({
+                "Dimension": dimension,
+                "Group": group,
+                "Coef": res["coefficient"],
+                "SE": res["se"],
+                "P-value": pval,
+                "N": res.get("n_obs", ""),
+                "Sig": "***" if pval < 0.01 else "**" if pval < 0.05 else "*" if pval < 0.1 else ""
+            })
+    
+    def run_split(dim_name, col, val_true, val_false, label_true, label_false):
+        for val, label in [(val_true, label_true), (val_false, label_false)]:
+            if col not in panel.columns:
+                continue
+            subset = panel[panel[col] == val]
+            if len(subset) >= min_obs and subset[id_col].nunique() >= min_facilities: # type: ignore
+                try:
+                    res = run_outcome_models(
+                        subset, outcome_col=outcome_col, # type: ignore
+                        treatment_col=treatment_col, controls=controls, cluster_col=cluster_col
+                    )
+                    add_row(dim_name, label, res)
+                except:
+                    pass
+    
+    # 1. Electricity sector
+    run_split("Sector", electricity_col, True, False, "Electricity", "Other Sectors")
+    
+    # 2. Urbanization
+    run_split("Location", urban_col, True, False, "Urban", "Rural")
+    
+    # 3. Fuel type - by dominant fuel
+    fuel_cols = ["share_coal", "share_gas", "share_oil", "share_biomass"]
+    fuel_cols = [c for c in fuel_cols if c in panel.columns]
+    if fuel_cols:
+        panel = panel.copy()
+        # Determine dominant fuel for each observation
+        fuel_shares = panel[fuel_cols].fillna(0)
+        panel["_dominant_fuel"] = fuel_shares.idxmax(axis=1).str.replace("share_", "").str.title() # type: ignore
+        
+        # Run for each dominant fuel type with enough observations
+        for fuel in panel["_dominant_fuel"].unique():
+            subset = panel[panel["_dominant_fuel"] == fuel]
+            if len(subset) >= min_obs and subset[id_col].nunique() >= min_facilities: # type: ignore
+                try:
+                    res = run_outcome_models(
+                        subset, outcome_col=outcome_col, # type: ignore
+                        treatment_col=treatment_col, controls=controls, cluster_col=cluster_col
+                    )
+                    add_row("Fuel", fuel, res)
+                except:
+                    pass
+    
+    # 4. Top countries
+    if "country_code" in panel.columns:
+        top_countries = panel.groupby("country_code")[id_col].nunique().nlargest(5).index # type: ignore
+        for country in top_countries:
+            subset = panel[panel["country_code"] == country]
+            if len(subset) >= min_obs and subset[id_col].nunique() >= min_facilities: # type: ignore
+                try:
+                    res = run_outcome_models(
+                        subset, outcome_col=outcome_col, # type: ignore
+                        treatment_col=treatment_col, controls=controls, cluster_col=cluster_col
+                    )
+                    add_row("Country", str(country), res)
+                except:
+                    pass
+    
+    # 6. Top PyPSA clusters (electricity grid regions - electricity only)
+    if "pypsa_cluster" in panel.columns and electricity_col in panel.columns:
+        elec_panel = panel[panel[electricity_col] == True]
+        if len(elec_panel) >= min_obs:
+            top_pypsa = elec_panel.groupby("pypsa_cluster")[id_col].nunique().nlargest(5).index # type: ignore
+            for cluster in top_pypsa:
+                subset = elec_panel[elec_panel["pypsa_cluster"] == cluster]
+                if len(subset) >= min_obs and subset[id_col].nunique() >= min_facilities: # type: ignore
+                    try:
+                        res = run_outcome_models(
+                            subset, outcome_col=outcome_col, # type: ignore
+                            treatment_col=treatment_col, controls=controls, cluster_col=cluster_col
+                        )
+                        add_row("PyPSA (Elec)", str(cluster), res)
+                    except:
+                        pass
+    
+    return pd.DataFrame(rows)
+
+
+def run_full_heterogeneity_analysis(
+    panel: pd.DataFrame,
+    ets_col: str = LOG_ETS_CO2_COL,
+    nox_col: str = "beirle_nox_kg_s",
+    treatment_col: str = TREATMENT_COL,
+    base_controls: List[str] = [],
+    cluster_col: str = CLUSTER_COL,
+    id_col: str = FAC_ID_COL,
+    electricity_col: str = "is_electricity",
+    urban_col: str = "in_urban_area"
+) -> Dict[str, pd.DataFrame]:
+    """
+    Run heterogeneity analysis for all 5 TWFE specifications.
+    
+    Returns dict mapping spec name -> results DataFrame.
+    """
+    from embedding_reduction import reduce_embeddings, get_reduced_embedding_cols
+    
+    if base_controls is []:
+        base_controls = ["capacity_mw", "share_coal", "share_gas"]
+    
+    results = {}
+    
+    # 1. ETS CO₂
+    print("Running heterogeneity: ETS CO₂...")
+    results["ETS CO₂"] = run_heterogeneity_analysis(
+        panel, outcome_col=ets_col, treatment_col=treatment_col,
+        controls=base_controls, cluster_col=cluster_col, id_col=id_col,
+        electricity_col=electricity_col, urban_col=urban_col
+    )
+    
+    # 2-5. NOx: (PCA/PLS) × (Permissive/Conservative)
+    if nox_col not in panel.columns:
+        return results
+    
+    for dl_col, dl_label in [("above_dl_0_03", "DL≥0.03"), ("above_dl_0_11", "DL≥0.11")]:
+        if dl_col not in panel.columns:
+            continue
+        nox_sample = panel[panel[dl_col] == True].copy()
+        if len(nox_sample) < 50:
+            print(f"  Skipping {dl_label}: insufficient data")
+            continue
+        
+        for emb_method in ["pca", "pls"]:
+            spec_name = f"NOx ({emb_method.upper()}, {dl_label})"
+            print(f"Running heterogeneity: {spec_name}...")
+            try:
+                df_reduced = reduce_embeddings(
+                    nox_sample.copy(), method=emb_method, n_components=10, # type: ignore
+                    target_col=nox_col if emb_method == "pls" else None
+                )
+                emb_cols = get_reduced_embedding_cols(df_reduced, method=emb_method)
+                controls_with_emb = base_controls + emb_cols
+                
+                results[spec_name] = run_heterogeneity_analysis(
+                    df_reduced, outcome_col=nox_col, treatment_col=treatment_col,
+                    controls=controls_with_emb, cluster_col=cluster_col, id_col=id_col,
+                    electricity_col=electricity_col, urban_col=urban_col
+                )
+            except Exception as e:
+                print(f"  Error: {e}")
+    
+    return results
+
+
+def display_heterogeneity_results(results: Dict[str, pd.DataFrame]) -> None:
+    """Display heterogeneity results as formatted tables."""
+    print("\n" + "=" * 70)
+    print("HETEROGENEITY RESULTS SUMMARY")
+    print("=" * 70)
+    
+    for spec_name, df in results.items():
+        if df is None or len(df) == 0:
+            continue
+        print(f"\n### {spec_name}")
+        df_display = df.copy()
+        df_display["Coef"] = df_display["Coef"].apply(lambda x: f"{x:.4f}")
+        df_display["SE"] = df_display["SE"].apply(lambda x: f"{x:.4f}")
+        df_display["P-value"] = df_display["P-value"].apply(lambda x: f"{x:.4f}")
+        
+        # Use pandas display
+        from IPython.display import display
+        display(df_display)
+    
+    print("\n" + "-" * 70)
+    print("Note: Negative coef = policy stringency reduces emissions")
+    print("      * p<0.1, ** p<0.05, *** p<0.01")
+
+
+# =============================================================================
+# 7. Continuous Interaction Analysis (Fuel, Capacity, Urbanization)
+# =============================================================================
+
+def run_continuous_interaction_analysis(
+    df: pd.DataFrame,
+    outcome_col: str,
+    treatment_col: str = TREATMENT_COL,
+    controls: List[str] = [],
+    cluster_col: str = CLUSTER_COL,
+    id_col: str = FAC_ID_COL,
+    time_col: str = YEAR_COL,
+    urban_col: str = "in_urban_area"
+) -> pd.DataFrame:
+    """
+    Estimate treatment effect heterogeneity using interaction terms.
+    
+    Interactions included:
+    - Treatment × fuel shares (coal, gas, oil, biomass)
+    - Treatment × capacity_mw
+    - Treatment × urban (binary)
+    
+    Interpretation:
+    - Positive interaction = weaker (less negative) treatment effect for that characteristic
+    
+    Returns DataFrame with interaction coefficients.
+    """
+    import pyfixest as pf
+    
+    df = df.copy()
+    df = df.dropna(subset=[outcome_col, treatment_col])
+    
+    interaction_cols = []
+    main_effect_cols = []
+    
+    # 1. Fuel share interactions
+    fuel_cols = ["share_coal", "share_gas", "share_oil", "share_biomass"]
+    fuel_cols = [c for c in fuel_cols if c in df.columns]
+    for fuel_col in fuel_cols:
+        df[f"treat_x_{fuel_col}"] = df[treatment_col] * df[fuel_col].fillna(0)
+        interaction_cols.append(f"treat_x_{fuel_col}")
+        main_effect_cols.append(fuel_col)
+    
+    # 2. Capacity interaction (standardized for interpretability)
+    if "capacity_mw" in df.columns:
+        cap_mean = df["capacity_mw"].mean()
+        cap_std = df["capacity_mw"].std()
+        df["capacity_std"] = (df["capacity_mw"] - cap_mean) / cap_std
+        df["treat_x_capacity"] = df[treatment_col] * df["capacity_std"]
+        interaction_cols.append("treat_x_capacity")
+        main_effect_cols.append("capacity_std")
+    
+    # 3. Urban interaction
+    if urban_col in df.columns:
+        df["_urban"] = df[urban_col].astype(float).fillna(0)
+        df["treat_x_urban"] = df[treatment_col] * df["_urban"]
+        interaction_cols.append("treat_x_urban")
+        main_effect_cols.append("_urban")
+    
+    if not interaction_cols:
+        print("No interaction variables found")
+        return pd.DataFrame()
+    
+    # Build formula
+    base_controls = [c for c in controls if c not in main_effect_cols and c != "capacity_mw"]
+    all_vars = [treatment_col] + interaction_cols + base_controls + main_effect_cols
+    var_str = " + ".join(all_vars)
+    fe_str = f"{id_col} + {cluster_col}^{time_col}"
+    formula = f"{outcome_col} ~ {var_str} | {fe_str}"
+    
+    print(f"\nContinuous Interaction Model:")
+    print(f"  Formula: {formula}")
+    
+    try:
+        model = pf.feols(formula, data=df, vcov={"CRV1": cluster_col})
+        
+        # Extract results for treatment and interactions
+        rows = []
+        for var in [treatment_col] + interaction_cols:
+            coef = model.coef().get(var, np.nan) # type: ignore
+            se = model.se().get(var, np.nan) # type: ignore
+            pval = model.pvalue().get(var, np.nan) # type: ignore
+            
+            # Clean up labels
+            label = var
+            label = label.replace("treat_x_share_", "× Fuel: ")
+            label = label.replace("treat_x_capacity", "× Capacity (std)")
+            label = label.replace("treat_x_urban", "× Urban")
+            label = label.replace(treatment_col, "Treatment (baseline)")
+            
+            sig = ""
+            if pval is not None and not np.isnan(pval):
+                sig = "***" if pval < 0.01 else "**" if pval < 0.05 else "*" if pval < 0.1 else ""
+            
+            rows.append({
+                "Variable": label,
+                "Coef": coef,
+                "SE": se,
+                "P-value": pval,
+                "Sig": sig
+            })
+        
+        return pd.DataFrame(rows)
+    
+    except Exception as e:
+        print(f"  Error: {e}")
+        return pd.DataFrame()
+
+
+# Alias for backward compatibility
+def run_fuel_interaction_analysis(*args, **kwargs):
+    """Deprecated: Use run_continuous_interaction_analysis instead."""
+    return run_continuous_interaction_analysis(*args, **kwargs)

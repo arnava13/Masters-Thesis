@@ -826,38 +826,21 @@ The coefficient $\beta$ is identified from within-facility variation in allocati
 
 Standard errors are clustered at the NUTS2 region level. NUTS2 regions ($\sim$200--300 across the EU) define economically coherent regional units that share common labor markets, policy enforcement mechanisms, and infrastructure characteristics.
 
-\subsection{Callaway-Sant'Anna Difference-in-Differences}\label{sec:methods:csdid}
+\subsection{Why Callaway-Sant'Anna Is Not Feasible}\label{sec:methods:csdid}
 
-The Callaway and Sant'Anna \cite{callaway2021} estimator addresses potential bias in standard TWFE when treatment timing varies across units and treatment effects are heterogeneous. The method estimates group-time average treatment effects:
-\begin{equation}
-ATT(g,t) = \mathbb{E}[Y_{it}(1) - Y_{it}(0) \mid G_i = g]
-\label{eq:attgt}
-\end{equation}
-for each cohort $g$ (first treatment year) and calendar time $t$.
+I initially planned to complement the TWFE analysis with the Callaway and Sant'Anna \cite{callaway2021} estimator, which addresses potential bias in standard TWFE when treatment timing varies across units and treatment effects are heterogeneous. However, this approach proved infeasible due to the structure of the data.
 
-Key features of the implementation:
+The CS-DiD estimator requires observing units \textit{before} they first receive treatment to establish parallel pre-trends. In my setting, defining treatment as allocation ratio $R_{it} < 1$, the ``cohort'' is the first year a facility crosses this threshold. The EU ETS has operated since 2005, and by the start of my panel (2018), the vast majority of facilities that would ever face allocation shortfalls were already in that state:
+
 \begin{itemize}
-    \item \textbf{Control group}: Never-treated units (facilities with $R_{it} \geq 1$ in all years)
-    \item \textbf{Estimation method}: Doubly robust (combining outcome regression and propensity score weighting)
-    \item \textbf{Anticipation}: Zero (no anticipation effects assumed)
+    \item Of 457 ever-treated facilities, \textbf{386 (84.5\%)} were already treated in 2018
+    \item Only 71 facilities (15.5\%) first crossed the threshold during 2019--2023
+    \item After excluding treatment reversers ($\sim$25\% of facilities), later cohorts have $<$10 units each
 \end{itemize}
 
-The group-time ATTs are aggregated to produce:
-\begin{enumerate}
-    \item \textbf{Simple aggregate ATT}: Overall average treatment effect across all treated observations:
-    \begin{equation}
-    ATT^{\text{simple}} = \sum_{g} \sum_{t \geq g} w_{g,t} \cdot ATT(g,t)
-    \label{eq:attsimple}
-    \end{equation}
-    \item \textbf{Dynamic/event-study ATT}: Effects by time relative to treatment:
-    \begin{equation}
-    ATT(e) = \sum_{g} w_g \cdot ATT(g, g+e)
-    \label{eq:attevent}
-    \end{equation}
-    where $e$ is event time (years since treatment onset)
-\end{enumerate}
+With 2018 as both the first panel year and the dominant cohort, there are no pre-treatment observations for most treated units. The CS-DiD estimator cannot identify treatment effects without this variation. Extending the panel backward to 2013--2017 (EU ETS Phase 3) could enable event-study analysis in future work.
 
-The event-study specification enables pre-trend testing: under parallel trends, $ATT(e) = 0$ for $e < 0$. A Wald test of joint nullity for pre-treatment periods provides formal evidence on the parallel trends assumption.
+I therefore rely on TWFE with continuous treatment, which does not require discrete cohort definitions and exploits within-facility variation in allocation ratios over time.
 
 \subsection{NUTS2-Based Clustering for Inference}\label{sec:methods:clustering}
 
@@ -889,23 +872,24 @@ where $\mathbf{M}$ is the residual maker for fixed effects and $\hat{\mathbf{u}}
 
 \subsection{Summary of Specifications}\label{sec:methods:summary}
 
-Table~\ref{tab:specs} summarizes the six core specifications estimated in this study. The dual-outcome design combined with two estimators and two embedding strategies for the satellite outcome yields six specifications.
+Table~\ref{tab:specs} summarizes the five core specifications estimated in this study. The dual-outcome design with two embedding reduction strategies yields five TWFE specifications.
+
+\textbf{Sample Definitions.} ETS CO$_2$ analysis uses the full panel of facilities with valid verified emissions. Satellite NOx analysis \textit{always} applies detection limit filtering---observations below the detection threshold are excluded. I estimate NOx specifications at two detection limits: (1) a permissive threshold of $\geq 0.03$ kg/s, which maximizes sample size; and (2) a conservative threshold of $\geq 0.11$ kg/s following \citet{beirle2019}, which restricts to higher-quality signals. The conservative sample serves as a robustness check.
 
 \begin{table}[h]
 \caption{Summary of Econometric Specifications}\label{tab:specs}%
-\begin{tabular*}{\textwidth}{@{\extracolsep\fill}clll}
+\begin{tabular*}{\textwidth}{@{\extracolsep\fill}cllll}
 \toprule
-Spec & Outcome & Embedding Strategy & Estimator \\
+Spec & Outcome & Sample & Embedding & Estimator \\
 \midrule
-1 & ETS CO$_2$ & None & TWFE \\
-2 & ETS CO$_2$ & None & Callaway-Sant'Anna \\
-3 & Satellite NOx & PCA (10 dims) & TWFE \\
-4 & Satellite NOx & PCA (10 dims) & Callaway-Sant'Anna \\
-5 & Satellite NOx & PLS (10 dims) & TWFE \\
-6 & Satellite NOx & PLS (10 dims) & Callaway-Sant'Anna \\
+1 & ETS CO$_2$ & Full (521 facilities) & None & TWFE \\
+2 & Satellite NOx & DL $\geq 0.03$ kg/s & PCA (10 dims) & TWFE \\
+3 & Satellite NOx & DL $\geq 0.03$ kg/s & PLS (10 dims) & TWFE \\
+4 & Satellite NOx & DL $\geq 0.11$ kg/s & PCA (10 dims) & TWFE \\
+5 & Satellite NOx & DL $\geq 0.11$ kg/s & PLS (10 dims) & TWFE \\
 \botrule
 \end{tabular*}
-\footnotetext{Note: ETS CO$_2$ uses no embeddings because geographic context does not affect administrative data measurement. For satellite NOx, PCA provides an unsupervised (outcome-agnostic) projection while PLS provides a supervised projection trained on facility-level mean NOx to ensure causal validity. All specifications use Facility + Region$\times$Year fixed effects and cluster standard errors by NUTS2 region.}
+\footnotetext{Note: ETS CO$_2$ uses no embeddings because geographic context does not affect administrative data measurement. For satellite NOx, PCA provides an unsupervised (outcome-agnostic) projection while PLS provides a supervised projection trained on facility-level mean NOx to ensure causal validity (Section~\ref{sec:methods:embeddings}). NOx analysis \textit{never} uses unfiltered samples---all NOx specifications require detection limit filtering. All specifications use Facility + Region$\times$Year fixed effects and cluster standard errors by NUTS2 region.}
 \end{table}
 
 %% ========================================================================
@@ -918,10 +902,9 @@ Spec & Outcome & Embedding Strategy & Estimator \\
 This section will present:
 \begin{enumerate}
     \item Descriptive statistics on treatment and outcome distributions
-    \item Estimates for all six specifications (Table~\ref{tab:specs})
-    \item Callaway-Sant'Anna event study results with pre-trend tests
+    \item Estimates for all five specifications (Table~\ref{tab:specs})
     \item Comparison of CO$_2$ and NOx responses: agreement in sign and magnitude
-    \item Stability of results across embedding strategies (PCA vs PLS)
+    \item Stability of results across embedding strategies (PCA vs PLS) and detection limits
 \end{enumerate}
 
 \subsection{Treatment Distribution}
@@ -950,26 +933,29 @@ Facilities & [--] & [--] \\
 $R^2$ (within) & [--] & [--] \\
 \botrule
 \end{tabular*}
-\footnotetext{Note: Standard errors clustered by NUTS2 region in parentheses. Controls include capacity (MW), fuel shares (coal, gas), and AlphaEarth embeddings (64 dimensions). * $p<0.10$, ** $p<0.05$, *** $p<0.01$.}
+\footnotetext{Note: Standard errors clustered by NUTS2 region in parentheses. ETS CO$_2$ controls include capacity (MW) and fuel shares (coal, gas). Satellite NOx controls additionally include AlphaEarth embeddings (10 PCA or PLS components). NOx sample restricted to observations above detection limit ($\geq 0.03$ kg/s for main specification). * $p<0.10$, ** $p<0.05$, *** $p<0.01$.}
 \end{table}
-
-\subsection{Event Study}
-
-Figure~\ref{fig:eventstudy} presents the Callaway-Sant'Anna event study results for both outcomes, plotting dynamic treatment effects by years relative to treatment onset. Comparison of CO$_2$ and NOx event-study patterns provides a cross-validation of policy effects: if carbon pricing reduces combustion, both outcomes should show similar post-treatment declines.
-
-[Event study figure to be added.]
-
-Pre-trend tests: [Wald test results to be added.]
 
 \subsection{Robustness}
 
 [Robustness analysis to be added, including:]
 \begin{itemize}
-    \item Alternative emissions thresholds (250 kt, 500 kt)
-    \item Alternative treatment definitions (shortfall instead of ratio)
-    \item Heterogeneity by fuel type and country
-    \item Sensitivity to NOx detection limit (excluding facilities below 0.11 kg/s)
-    \item Comparison of CO$_2$ vs NOx elasticities (percentage changes)
+    \item Sensitivity to NOx detection limit (conservative 0.11 kg/s vs permissive 0.03 kg/s)
+    \item Embedding reduction method (PCA vs PLS)
+    \item Split-sample heterogeneity analysis by:
+    \begin{itemize}
+        \item Electricity sector (activity codes 1, 20) vs other sectors
+        \item Urbanization (urban vs rural facilities)
+        \item Dominant fuel type (coal, gas, oil, biomass)
+        \item Country (top 5 by facility count)
+        \item PyPSA-Eur grid clusters (electricity sector only, top 5 by facility count)
+    \end{itemize}
+    \item Continuous interaction terms to test whether treatment effects vary with:
+    \begin{itemize}
+        \item Fuel composition (treatment $\times$ share\_coal, treatment $\times$ share\_gas, etc.)
+        \item Facility capacity (treatment $\times$ capacity, standardized)
+        \item Urbanization (treatment $\times$ urban, binary)
+    \end{itemize}
 \end{itemize}
 
 %% ========================================================================
@@ -1039,6 +1025,9 @@ Different facilities have different numbers of valid observation days per year (
 
 \textbf{UK exclusion.}
 The EU ETS registry data used in this study does not include installations in the United Kingdom following Brexit. The UK withdrew from the EU ETS on January 1, 2021, and established its own UK Emissions Trading Scheme \cite{ukgov2024ukets}. Consequently, UK large combustion plants---which represented a significant share of EU ETS-regulated capacity prior to 2021---are excluded from the analysis panel. Future work extending this framework to include UK facilities would require obtaining compliance data from the UK ETS registry and harmonizing it with the EU data sources used here. This may be facilitated in the near future by the linking of the UK and EU's ETS systems.
+
+\textbf{Event-study analysis.}
+The Callaway-Sant'Anna \cite{callaway2021} estimator would provide a valuable robustness check through event-study plots and formal pre-trend tests. However, as discussed in Section~\ref{sec:methods:csdid}, this approach is infeasible with the current panel (2018--2023) because 84.5\% of ever-treated facilities were already treated in the first panel year. Extending the panel backward to include EU ETS Phase 3 (2013--2017) would capture the actual first-treatment timing for most facilities, enabling event-study analysis with proper pre-treatment observations. This represents a natural extension for future work.
 
 %% ========================================================================
 %% CONCLUSION
