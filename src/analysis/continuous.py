@@ -9,7 +9,6 @@ Rationale: Region×Year FE absorbs regional time-varying confounders (electricit
 fuel prices, policy enforcement) that affect both treatment assignment and outcomes.
 
 Uses pyfixest for fast high-dimensional FE estimation.
-    pip install pyfixest
 """
 
 import pandas as pd

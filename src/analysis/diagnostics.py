@@ -351,6 +351,8 @@ def run_heterogeneity_analysis(
     id_col: str = FAC_ID_COL,
     electricity_col: str = "is_electricity",
     urban_col: str = "in_urban_area",
+    interfered_col: str = "interfered_20km",
+    low_stat_err_col: str = "rel_err_stat_lt_0_3",
     min_obs: int = 20,
     min_facilities: int = 5
 ) -> pd.DataFrame:
@@ -373,6 +375,10 @@ def run_heterogeneity_analysis(
         Column for electricity sector split
     urban_col : str
         Column for urban/rural split
+    interfered_col : str
+        Column for facility interference flag (another facility within 20km)
+    low_stat_err_col : str
+        Column for low statistical error flag (rel_err_stat < 30%)
     min_obs : int
         Minimum observations required per subsample
     min_facilities : int
@@ -401,10 +407,17 @@ def run_heterogeneity_analysis(
             })
     
     def run_split(dim_name, col, val_true, val_false, label_true, label_false):
+        if col not in panel.columns or col == "":
+            return
         for val, label in [(val_true, label_true), (val_false, label_false)]:
-            if col not in panel.columns:
-                continue
-            subset = panel[panel[col] == val]
+            # Robust boolean comparison (handles True/False, 1/0, and NaN)
+            if val is True or val == 1:
+                subset = panel[panel[col].fillna(False).astype(bool) == True]
+            elif val is False or val == 0:
+                subset = panel[panel[col].fillna(True).astype(bool) == False]
+            else:
+                subset = panel[panel[col] == val]
+            
             if len(subset) >= min_obs and subset[id_col].nunique() >= min_facilities: # type: ignore
                 try:
                     res = run_outcome_models(
@@ -412,8 +425,8 @@ def run_heterogeneity_analysis(
                         treatment_col=treatment_col, controls=controls, cluster_col=cluster_col
                     )
                     add_row(dim_name, label, res)
-                except:
-                    pass
+                except Exception as e:
+                    print(f"  Warning: {dim_name}/{label} failed: {e}")
     
     # 1. Electricity sector
     run_split("Sector", electricity_col, True, False, "Electricity", "Other Sectors")
@@ -421,7 +434,13 @@ def run_heterogeneity_analysis(
     # 2. Urbanization
     run_split("Location", urban_col, True, False, "Urban", "Rural")
     
-    # 3. Fuel type - by dominant fuel
+    # 3. Facility interference (satellite measurement quality)
+    run_split("Interference", interfered_col, False, True, "Isolated (<20km)", "Interfered (≥20km)")
+    
+    # 4. Statistical integration error (satellite measurement quality)
+    run_split("Stat. Error", low_stat_err_col, True, False, "Low (<30%)", "High (≥30%)")
+    
+    # 5. Fuel type - by dominant fuel
     fuel_cols = ["share_coal", "share_gas", "share_oil", "share_biomass"]
     fuel_cols = [c for c in fuel_cols if c in panel.columns]
     if fuel_cols:
@@ -443,7 +462,7 @@ def run_heterogeneity_analysis(
                 except:
                     pass
     
-    # 4. Top countries
+    # 6. Top countries
     if "country_code" in panel.columns:
         top_countries = panel.groupby("country_code")[id_col].nunique().nlargest(5).index # type: ignore
         for country in top_countries:
@@ -458,7 +477,7 @@ def run_heterogeneity_analysis(
                 except:
                     pass
     
-    # 6. Top PyPSA clusters (electricity grid regions - electricity only)
+    # 7. Top PyPSA clusters (electricity grid regions - electricity only)
     if "pypsa_cluster" in panel.columns and electricity_col in panel.columns:
         elec_panel = panel[panel[electricity_col] == True]
         if len(elec_panel) >= min_obs:
@@ -487,10 +506,15 @@ def run_full_heterogeneity_analysis(
     cluster_col: str = CLUSTER_COL,
     id_col: str = FAC_ID_COL,
     electricity_col: str = "is_electricity",
-    urban_col: str = "in_urban_area"
+    urban_col: str = "in_urban_area",
+    interfered_col: str = "interfered_20km",
+    low_stat_err_col: str = "rel_err_stat_lt_0_3"
 ) -> Dict[str, pd.DataFrame]:
     """
     Run heterogeneity analysis for all 5 TWFE specifications.
+    
+    Includes satellite measurement quality dimensions (interference, stat error)
+    for NOx specifications only.
     
     Returns dict mapping spec name -> results DataFrame.
     """
@@ -501,12 +525,13 @@ def run_full_heterogeneity_analysis(
     
     results = {}
     
-    # 1. ETS CO₂
+    # 1. ETS CO₂ (no satellite quality flags - those are NOx-specific)
     print("Running heterogeneity: ETS CO₂...")
     results["ETS CO₂"] = run_heterogeneity_analysis(
         panel, outcome_col=ets_col, treatment_col=treatment_col,
         controls=base_controls, cluster_col=cluster_col, id_col=id_col,
-        electricity_col=electricity_col, urban_col=urban_col
+        electricity_col=electricity_col, urban_col=urban_col,
+        interfered_col="", low_stat_err_col=""  # Not applicable to ETS
     )
     
     # 2-5. NOx: (PCA/PLS) × (Permissive/Conservative)
@@ -535,7 +560,8 @@ def run_full_heterogeneity_analysis(
                 results[spec_name] = run_heterogeneity_analysis(
                     df_reduced, outcome_col=nox_col, treatment_col=treatment_col,
                     controls=controls_with_emb, cluster_col=cluster_col, id_col=id_col,
-                    electricity_col=electricity_col, urban_col=urban_col
+                    electricity_col=electricity_col, urban_col=urban_col,
+                    interfered_col=interfered_col, low_stat_err_col=low_stat_err_col
                 )
             except Exception as e:
                 print(f"  Error: {e}")
@@ -619,12 +645,12 @@ def run_continuous_interaction_analysis(
         interaction_cols.append("treat_x_capacity")
         main_effect_cols.append("capacity_std")
     
-    # 3. Urban interaction
+    # 3. Urban interaction (time-invariant, so NO main effect - absorbed by facility FE)
     if urban_col in df.columns:
         df["_urban"] = df[urban_col].astype(float).fillna(0)
         df["treat_x_urban"] = df[treatment_col] * df["_urban"]
         interaction_cols.append("treat_x_urban")
-        main_effect_cols.append("_urban")
+        # NOTE: Don't add _urban to main_effect_cols - it's time-invariant and absorbed by facility FE
     
     if not interaction_cols:
         print("No interaction variables found")
