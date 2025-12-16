@@ -306,7 +306,7 @@ def run_csdid_dual_outcome(
     cluster_col: str = CLUSTER_COL,
     ets_col: str = "log_ets_co2",
     nox_col: str = "beirle_nox_kg_s",
-    nox_dl_col: str = "above_dl_0_03",
+    nox_dl_col: str = "above_dl_permissive",
     embedding_n_components: int = 10,
     embedding_prefix: str = "emb_",
     **kwargs
@@ -333,7 +333,7 @@ def run_csdid_dual_outcome(
     nox_col : str
         Satellite NOx outcome column
     nox_dl_col : str
-        Detection limit column: 'above_dl_0_03' (permissive) or 'above_dl_0_11' (conservative)
+        Detection limit column: 'above_dl_permissive' (permissive) or 'above_dl_conservative' (conservative)
     embedding_n_components : int
         Number of components for reduced embeddings (default: 10)
     embedding_prefix : str
@@ -374,7 +374,7 @@ def run_csdid_dual_outcome(
     # Apply detection limit filter (REQUIRED)
     if nox_dl_col in df_nox.columns:
         df_nox = df_nox[df_nox[nox_dl_col] == True]
-        dl_label = "≥0.03 kg/s" if "0_03" in nox_dl_col else "≥0.11 kg/s"
+        dl_label = "≥0.01 kg/s" if "permissive" in nox_dl_col else "≥0.04 kg/s"
     else:
         df_nox = df_nox.dropna(subset=[nox_col])
         dl_label = "non-missing"

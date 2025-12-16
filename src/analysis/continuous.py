@@ -375,13 +375,56 @@ def run_ets_analysis(
     )
 
 
+def run_reported_nox_analysis(
+    df: pd.DataFrame,
+    treatment_col: str,
+    controls: Optional[List[str]] = None,
+    cluster_col: str = _DEFAULT_CLUSTER_COL,
+    nox_col: str = "log_reported_nox",
+) -> Dict:
+    """
+    Run TWFE for reported NOx outcome.
+    
+    Reported NOx is from EEA Large Combustion Plant directive (LCP) reporting.
+    Like ETS CO₂, this is administrative data with legal compliance requirements,
+    so we do NOT use satellite embeddings as controls.
+    
+    Sample is restricted to observations with non-missing reported NOx.
+    
+    Returns
+    -------
+    Dict with TWFE results for reported NOx
+    """
+    print("\n" + "=" * 70)
+    print("REPORTED NOx EMISSIONS (LCP DIRECTIVE)")
+    print("  Sample: Facilities with LCP NOx reporting")
+    print("  Controls: base only (embeddings NOT used - administrative data)")
+    print("=" * 70)
+    
+    # Filter to non-missing reported NOx
+    df_nox = df.dropna(subset=[nox_col])
+    n_total = len(df)
+    n_valid = len(df_nox)
+    print(f"  Observations with reported NOx: {n_valid:,} / {n_total:,}")
+    
+    if n_valid < 50:
+        print(f"WARNING: Insufficient observations ({n_valid})")
+        return {}
+    
+    return run_outcome_models(
+        df_nox, outcome_col=nox_col, treatment_col=treatment_col,
+        controls=controls, cluster_col=cluster_col,
+        label="Reported NOx (tonnes/yr, log)"
+    )
+
+
 def run_nox_analysis(
     df: pd.DataFrame,
     treatment_col: str,
     controls: Optional[List[str]] = None,
     cluster_col: str = _DEFAULT_CLUSTER_COL,
     nox_col: str = "beirle_nox_kg_s",
-    nox_dl_col: str = "above_dl_0_03",
+    nox_dl_col: str = "above_dl_permissive",
     nox_weight_col: Optional[str] = "nox_weight",
     embedding_n_components: int = 10,
     embedding_prefix: str = "emb_"
@@ -390,7 +433,7 @@ def run_nox_analysis(
     Run TWFE for Satellite NOx outcome with detection limit filter.
     
     IMPORTANT: NOx analysis ALWAYS requires detection limit filtering.
-    Samples below detection limit (0.03 kg/s minimum) are excluded.
+    Samples below detection limit (0.01 kg/s minimum) are excluded.
     
     Runs BOTH embedding reduction strategies (PCA and PLS) as robustness checks.
     
@@ -399,7 +442,7 @@ def run_nox_analysis(
     df : DataFrame
         Panel data (will be filtered by detection limit)
     nox_dl_col : str
-        Detection limit column: 'above_dl_0_03' (permissive) or 'above_dl_0_11' (conservative)
+        Detection limit column: 'above_dl_permissive' (permissive) or 'above_dl_conservative' (conservative)
     nox_weight_col : str, optional
         Column for inverse-variance weights
     embedding_n_components : int
@@ -423,7 +466,7 @@ def run_nox_analysis(
     # Apply detection limit filter
     if nox_dl_col in df_nox.columns:
         df_nox = df_nox[df_nox[nox_dl_col] == True]
-        dl_label = "≥0.03 kg/s" if "0_03" in nox_dl_col else "≥0.11 kg/s"
+        dl_label = "≥0.01 kg/s" if "permissive" in nox_dl_col else "≥0.04 kg/s"
     else:
         # Fallback: require non-missing NOx
         df_nox = df_nox.dropna(subset=[nox_col])
@@ -498,7 +541,7 @@ def run_dual_outcome_analysis(
     cluster_col: str = _DEFAULT_CLUSTER_COL,
     ets_col: str = "log_ets_co2",
     nox_col: str = "beirle_nox_kg_s",
-    nox_dl_col: str = "above_dl_0_03",
+    nox_dl_col: str = "above_dl_permissive",
     nox_weight_col: Optional[str] = "nox_weight",
     embedding_n_components: int = 10,
     embedding_prefix: str = "emb_"
@@ -515,7 +558,7 @@ def run_dual_outcome_analysis(
     Parameters
     ----------
     nox_dl_col : str
-        Detection limit column: 'above_dl_0_03' (permissive) or 'above_dl_0_11' (conservative)
+        Detection limit column: 'above_dl_permissive' (permissive) or 'above_dl_conservative' (conservative)
     
     Returns
     -------

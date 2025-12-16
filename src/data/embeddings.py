@@ -24,7 +24,7 @@ from pandas import DataFrame
 # =============================================================================
 
 ALPHA_EARTH_COLLECTION = "GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL"
-EMBEDDING_SCALE_M = 10_000  # 10km - EE averages the cell automatically
+EMBEDDING_SCALE_M = 5_000  # 5km - EE averages the cell automatically
 N_EMBEDDING_DIMS = 64
 DEFAULT_DRIVE_FOLDER = 'ee_embedding_exports'
 

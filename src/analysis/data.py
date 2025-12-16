@@ -27,13 +27,12 @@ LOG_ETS_CO2_COL = "log_ets_co2"
 MIN_VERIFIED_CO2_TCO2 = 100_000
 NOX_OUTCOME_COL = "beirle_nox_kg_s"
 NOX_SE_COL = "beirle_nox_kg_s_se"
-DL_0_11_COL = "above_dl_0_11"
-DL_0_03_COL = "above_dl_0_03"
-DL_CONSERVATIVE_COL = DL_0_11_COL
-DL_PERMISSIVE_COL = DL_0_03_COL
+REPORTED_NOX_COL = "reported_nox_tonnes"
+LOG_REPORTED_NOX_COL = "log_reported_nox"
+ABOVE_DL_COL = "above_dl"
 REL_ERR_STAT_LT_0_3_COL = "rel_err_stat_lt_0_3"
 N_DAYS_SATELLITE_COL = "n_days_satellite"
-INTERFERED_20KM_COL = "interfered_20km"
+INTERFERED_COL = "interfered_5km"
 URBANIZATION_DEGREE_COL = "urbanization_degree"
 IN_URBAN_AREA_COL = "in_urban_area"
 IS_ELECTRICITY_COL = "is_electricity"  # EU ETS activity codes 1 or 20 (combustion)
@@ -113,7 +112,7 @@ def load_analysis_panel(
     # Merge static info into yearly panel
     # Note: urbanization and interference variables are for heterogeneity analysis, not regression controls
     static_cols = [FAC_ID_COL, "lat", "lon", "country_code", "nuts2_region", "pypsa_cluster",
-                   "is_electricity", URBANIZATION_DEGREE_COL, IN_URBAN_AREA_COL, INTERFERED_20KM_COL]
+                   "is_electricity", URBANIZATION_DEGREE_COL, IN_URBAN_AREA_COL, INTERFERED_COL]
     static_cols = [c for c in static_cols if c in static.columns]
     
     panel = yearly.merge(
@@ -127,6 +126,11 @@ def load_analysis_panel(
         # Add small offset to handle zeros
         panel[LOG_ETS_CO2_COL] = np.log(panel[ETS_CO2_COL] + 1)
     
+    # Create log-transformed reported NOx outcome
+    if REPORTED_NOX_COL in panel.columns:
+        # Add small offset to handle zeros; NaN preserved
+        panel[LOG_REPORTED_NOX_COL] = np.log(panel[REPORTED_NOX_COL] + 1)
+    
     # Merge satellite outcomes (includes AlphaEarth embeddings for NOx retrieval context)
     # NOTE: Embeddings are stored in beirle_panel, NOT facilities_yearly, because they
     # are controls for the satellite measurement process (terrain, land use, climate)
@@ -137,7 +141,7 @@ def load_analysis_panel(
             # Keep key columns from Beirle panel (including embeddings if present)
             beirle_cols = [FAC_ID_COL, YEAR_COL, NOX_OUTCOME_COL, NOX_SE_COL,
                           "rel_err_total", "rel_err_stat", "rel_err_tau",
-                          DL_CONSERVATIVE_COL, DL_PERMISSIVE_COL, N_DAYS_SATELLITE_COL]
+                          ABOVE_DL_COL, N_DAYS_SATELLITE_COL]
             # Add embedding columns (emb_* pattern)
             emb_cols = [c for c in beirle.columns if c.startswith("emb_")]
             beirle_cols.extend(emb_cols)
@@ -462,9 +466,9 @@ def get_satellite_sample(
     sample : str
         Sample definition:
         - "all": All facilities with non-missing satellite outcome
-        - "significant": above_dl_0_11 AND rel_err_stat_lt_0_3
+        - "significant": above_dl_conservative AND rel_err_stat_lt_0_3
     exclude_interfered : bool
-        If True, also exclude facilities with interfered_20km == True
+        If True, also exclude facilities with interfered_{n}km == True
         (where satellite outcome reflects cluster-level emissions)
     
     Returns
@@ -480,9 +484,9 @@ def get_satellite_sample(
     
     # Apply significance filters based on sample definition
     if sample == "significant":
-        # Detection limit: >= 0.11 kg/s (standard European conditions)
-        if DL_0_11_COL in df.columns:
-            df = df[df[DL_0_11_COL] == True] # type: ignore
+        # Detection limit: >= 0.01 kg/s (permissive threshold for statistical power)
+        if ABOVE_DL_COL in df.columns:
+            df = df[df[ABOVE_DL_COL] == True] # type: ignore
         # Statistical integration error < 30%
         if REL_ERR_STAT_LT_0_3_COL in df.columns:
             df = df[df[REL_ERR_STAT_LT_0_3_COL] == True] # type: ignore
@@ -490,8 +494,8 @@ def get_satellite_sample(
         raise ValueError(f"Unknown sample: {sample}. Use 'all' or 'significant'.")
     
     # Optionally exclude interfered facilities
-    if exclude_interfered and INTERFERED_20KM_COL in df.columns:
-        df = df[df[INTERFERED_20KM_COL] == False] # type: ignore
+    if exclude_interfered and INTERFERED_COL in df.columns:
+        df = df[df[INTERFERED_COL] == False] # type: ignore
     
     n_after = len(df)
     n_fac = df[FAC_ID_COL].nunique() if FAC_ID_COL in df.columns else "?"
@@ -503,7 +507,6 @@ def get_satellite_sample(
 
 def apply_satellite_filters(
     df: pd.DataFrame,
-    detection_limit: str = "conservative",
     max_rel_err: Optional[float] = None,
     min_days: int = 30
 ) -> pd.DataFrame:
@@ -517,8 +520,6 @@ def apply_satellite_filters(
     ----------
     df : DataFrame
         Panel with satellite outcomes
-    detection_limit : str
-        "conservative" (0.11 kg/s) or "permissive" (0.03 kg/s)
     max_rel_err : float, optional
         Maximum total relative uncertainty (e.g., 0.5 for 50%)
     min_days : int
@@ -538,11 +539,10 @@ def apply_satellite_filters(
     n_before = len(df)
     df = df.copy()
     
-    # Detection limit filter (using new column names)
-    dl_col = DL_0_11_COL if detection_limit == "conservative" else DL_0_03_COL
-    if dl_col in df.columns:
-        df = df[df[dl_col] == True] # type: ignore
-        print(f"Detection limit ({detection_limit}): {len(df)} obs retained")
+    # Detection limit filter (single threshold: 0.01 kg/s)
+    if ABOVE_DL_COL in df.columns:
+        df = df[df[ABOVE_DL_COL] == True] # type: ignore
+        print(f"Detection limit (≥0.01 kg/s): {len(df)} obs retained")
     
     # Relative uncertainty filter
     if max_rel_err and "rel_err_total" in df.columns:
@@ -560,17 +560,15 @@ def apply_satellite_filters(
     return df
 
 
-def get_intersection_samples(
+def get_satellite_sample_filtered(
     df: pd.DataFrame,
-    ets_col: str = ETS_CO2_COL,
     exclude_interfered: bool = False
-) -> Dict[str, pd.DataFrame]:
+) -> pd.DataFrame:
     """
-    Get intersection samples with both valid ETS and satellite outcomes.
+    Get satellite sample with valid outcomes above detection limit.
     
-    Returns samples for BOTH detection limits for robustness comparison:
-    - 'permissive' (DL ≥ 0.03 kg/s): larger sample, more noise
-    - 'conservative' (DL ≥ 0.11 kg/s): smaller sample, higher quality signals
+    Uses single detection limit of 0.01 kg/s (chosen for statistical power,
+    acknowledging this is well below Beirle's validated thresholds).
     
     Parameters
     ----------
@@ -583,48 +581,30 @@ def get_intersection_samples(
     
     Returns
     -------
-    Dict with keys 'permissive' (DL 0.03) and 'conservative' (DL 0.11)
+    Filtered DataFrame with valid satellite observations above DL
     """
-    results: Dict[str, pd.DataFrame] = {}
-    
     # Base: require ETS outcome and non-missing satellite
     base_df = df.copy()
-    base_df = base_df.dropna(subset=[ets_col])
     base_df = base_df.dropna(subset=[NOX_OUTCOME_COL])
     
     print("\n" + "=" * 60)
-    print("INTERSECTION SAMPLES (ETS + Satellite)")
+    print("SATELLITE SAMPLE (ETS + Satellite)")
     print("=" * 60)
     
-    # Permissive: DL ≥ 0.03 kg/s (all valid satellite obs)
-    if DL_PERMISSIVE_COL in base_df.columns:
-        perm_df = base_df[base_df[DL_PERMISSIVE_COL] == True].copy()
+    # Detection limit: ≥ 0.01 kg/s
+    if ABOVE_DL_COL in base_df.columns:
+        result_df = base_df[base_df[ABOVE_DL_COL] == True].copy()
     else:
-        perm_df = base_df.copy()  # If no flag, use all
+        result_df = base_df.copy()  # If no flag, use all
     
-    if exclude_interfered and INTERFERED_20KM_COL in perm_df.columns:
-        perm_df = perm_df[perm_df[INTERFERED_20KM_COL] == False]
+    if exclude_interfered and INTERFERED_COL in result_df.columns:
+        result_df = result_df[result_df[INTERFERED_COL] == False]
     
-    results["permissive"] = perm_df # type: ignore
-    n_perm = len(perm_df)
-    n_fac_perm = perm_df[FAC_ID_COL].nunique() # type: ignore
-    print(f"  Permissive (DL ≥ 0.03): {n_perm} obs, {n_fac_perm} facilities")
+    n_obs = len(result_df)
+    n_fac = result_df[FAC_ID_COL].nunique() # type: ignore
+    print(f"  DL ≥ 0.01 kg/s: {n_obs} obs, {n_fac} facilities")
     
-    # Conservative: DL ≥ 0.11 kg/s (Beirle standard)
-    if DL_CONSERVATIVE_COL in base_df.columns:
-        cons_df = base_df[base_df[DL_CONSERVATIVE_COL] == True].copy()
-    else:
-        cons_df = base_df.copy()
-    
-    if exclude_interfered and INTERFERED_20KM_COL in cons_df.columns:
-        cons_df = cons_df[cons_df[INTERFERED_20KM_COL] == False]
-    
-    results["conservative"] = cons_df # type: ignore
-    n_cons = len(cons_df)
-    n_fac_cons = cons_df[FAC_ID_COL].nunique() # type: ignore
-    print(f"  Conservative (DL ≥ 0.11): {n_cons} obs, {n_fac_cons} facilities")
-    
-    return results
+    return result_df # type: ignore
 
 
 def summarize_satellite_flags(df: pd.DataFrame) -> pd.DataFrame:
@@ -640,11 +620,10 @@ def summarize_satellite_flags(df: pd.DataFrame) -> pd.DataFrame:
     
     summary = []
     for col, label in [
-        (DL_0_11_COL, "above_dl_0_11 (≥0.11 kg/s)"),
-        (DL_0_03_COL, "above_dl_0_03 (≥0.03 kg/s)"),
+        (ABOVE_DL_COL, "above_dl (≥0.01 kg/s)"),
         (REL_ERR_STAT_LT_0_3_COL, "rel_err_stat < 30%"),
-        (INTERFERED_20KM_COL, "interfered_20km"),
-        (IN_URBAN_AREA_COL, "in_urban_area (SMOD ≥21)"),
+        (INTERFERED_COL, "interfered_5km"),
+        (IN_URBAN_AREA_COL, "in_urban_area (SMOD ≥22)"),
     ]:
         if col in sat_df.columns:
             n_true = sat_df[col].sum()

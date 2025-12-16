@@ -351,7 +351,7 @@ def run_heterogeneity_analysis(
     id_col: str = FAC_ID_COL,
     electricity_col: str = "is_electricity",
     urban_col: str = "in_urban_area",
-    interfered_col: str = "interfered_20km",
+    interfered_col: str = "interfered_5km",
     low_stat_err_col: str = "rel_err_stat_lt_0_3",
     min_obs: int = 20,
     min_facilities: int = 5
@@ -376,7 +376,7 @@ def run_heterogeneity_analysis(
     urban_col : str
         Column for urban/rural split
     interfered_col : str
-        Column for facility interference flag (another facility within 20km)
+        Column for facility interference flag (another facility within 5km)
     low_stat_err_col : str
         Column for low statistical error flag (rel_err_stat < 30%)
     min_obs : int
@@ -435,7 +435,7 @@ def run_heterogeneity_analysis(
     run_split("Location", urban_col, True, False, "Urban", "Rural")
     
     # 3. Facility interference (satellite measurement quality)
-    run_split("Interference", interfered_col, False, True, "Isolated (<20km)", "Interfered (≥20km)")
+    run_split("Interference", interfered_col, False, True, "Isolated (<5km)", "Interfered (≥5km)")
     
     # 4. Statistical integration error (satellite measurement quality)
     run_split("Stat. Error", low_stat_err_col, True, False, "Low (<30%)", "High (≥30%)")
@@ -500,21 +500,25 @@ def run_heterogeneity_analysis(
 def run_full_heterogeneity_analysis(
     panel: pd.DataFrame,
     ets_col: str = LOG_ETS_CO2_COL,
-    nox_col: str = "beirle_nox_kg_s",
+    reported_nox_col: str = "log_reported_nox",
+    satellite_nox_col: str = "beirle_nox_kg_s",
     treatment_col: str = TREATMENT_COL,
     base_controls: List[str] = [],
     cluster_col: str = CLUSTER_COL,
     id_col: str = FAC_ID_COL,
     electricity_col: str = "is_electricity",
     urban_col: str = "in_urban_area",
-    interfered_col: str = "interfered_20km",
+    interfered_col: str = "interfered_5km",
     low_stat_err_col: str = "rel_err_stat_lt_0_3"
 ) -> Dict[str, pd.DataFrame]:
     """
-    Run heterogeneity analysis for all 5 TWFE specifications.
+    Run heterogeneity analysis for all TWFE specifications (triple outcomes).
     
-    Includes satellite measurement quality dimensions (interference, stat error)
-    for NOx specifications only.
+    Four Specifications:
+    1. ETS CO₂ (ground-truth) - no satellite quality flags
+    2. Reported NOx (ground-truth, LCP Directive) - no satellite quality flags
+    3. Satellite NOx (PCA, DL≥0.01) - includes interference/stat error dimensions
+    4. Satellite NOx (PLS, DL≥0.01) - includes interference/stat error dimensions
     
     Returns dict mapping spec name -> results DataFrame.
     """
@@ -525,7 +529,7 @@ def run_full_heterogeneity_analysis(
     
     results = {}
     
-    # 1. ETS CO₂ (no satellite quality flags - those are NOx-specific)
+    # 1. ETS CO₂ (no satellite quality flags - those are satellite NOx-specific)
     print("Running heterogeneity: ETS CO₂...")
     results["ETS CO₂"] = run_heterogeneity_analysis(
         panel, outcome_col=ets_col, treatment_col=treatment_col,
@@ -534,37 +538,54 @@ def run_full_heterogeneity_analysis(
         interfered_col="", low_stat_err_col=""  # Not applicable to ETS
     )
     
-    # 2-5. NOx: (PCA/PLS) × (Permissive/Conservative)
-    if nox_col not in panel.columns:
+    # 2. Reported NOx (ground-truth from LCP Directive - no satellite quality flags)
+    if reported_nox_col in panel.columns:
+        nox_sample = panel.dropna(subset=[reported_nox_col])
+        if len(nox_sample) >= 50:
+            print("Running heterogeneity: Reported NOx (LCP)...")
+            results["Reported NOx (LCP)"] = run_heterogeneity_analysis(
+                nox_sample, outcome_col=reported_nox_col, treatment_col=treatment_col,
+                controls=base_controls, cluster_col=cluster_col, id_col=id_col,
+                electricity_col=electricity_col, urban_col=urban_col,
+                interfered_col="", low_stat_err_col=""  # Not applicable to administrative data
+            )
+        else:
+            print(f"  Skipping Reported NOx: insufficient data ({len(nox_sample)} obs)")
+    
+    # 3-4. Satellite NOx: PCA and PLS (single DL of 0.01 kg/s for statistical power)
+    if satellite_nox_col not in panel.columns:
         return results
     
-    for dl_col, dl_label in [("above_dl_0_03", "DL≥0.03"), ("above_dl_0_11", "DL≥0.11")]:
-        if dl_col not in panel.columns:
-            continue
-        nox_sample = panel[panel[dl_col] == True].copy()
-        if len(nox_sample) < 50:
-            print(f"  Skipping {dl_label}: insufficient data")
-            continue
-        
-        for emb_method in ["pca", "pls"]:
-            spec_name = f"NOx ({emb_method.upper()}, {dl_label})"
-            print(f"Running heterogeneity: {spec_name}...")
-            try:
-                df_reduced = reduce_embeddings(
-                    nox_sample.copy(), method=emb_method, n_components=10, # type: ignore
-                    target_col=nox_col if emb_method == "pls" else None
-                )
-                emb_cols = get_reduced_embedding_cols(df_reduced, method=emb_method)
-                controls_with_emb = base_controls + emb_cols
-                
-                results[spec_name] = run_heterogeneity_analysis(
-                    df_reduced, outcome_col=nox_col, treatment_col=treatment_col,
-                    controls=controls_with_emb, cluster_col=cluster_col, id_col=id_col,
-                    electricity_col=electricity_col, urban_col=urban_col,
-                    interfered_col=interfered_col, low_stat_err_col=low_stat_err_col
-                )
-            except Exception as e:
-                print(f"  Error: {e}")
+    # Use single above_dl column (0.01 kg/s threshold)
+    dl_col = "above_dl"
+    if dl_col not in panel.columns:
+        print(f"  Skipping Satellite NOx: {dl_col} column not found")
+        return results
+    
+    sat_nox_sample = panel[panel[dl_col] == True].copy()
+    if len(sat_nox_sample) < 50:
+        print(f"  Skipping Satellite NOx: insufficient data ({len(sat_nox_sample)} obs)")
+        return results
+    
+    for emb_method in ["pca", "pls"]:
+        spec_name = f"Satellite NOx ({emb_method.upper()}, DL≥0.01)"
+        print(f"Running heterogeneity: {spec_name}...")
+        try:
+            df_reduced = reduce_embeddings(
+                sat_nox_sample.copy(), method=emb_method, n_components=10, # type: ignore
+                target_col=satellite_nox_col if emb_method == "pls" else None
+            )
+            emb_cols = get_reduced_embedding_cols(df_reduced, method=emb_method)
+            controls_with_emb = base_controls + emb_cols
+            
+            results[spec_name] = run_heterogeneity_analysis(
+                df_reduced, outcome_col=satellite_nox_col, treatment_col=treatment_col,
+                controls=controls_with_emb, cluster_col=cluster_col, id_col=id_col,
+                electricity_col=electricity_col, urban_col=urban_col,
+                interfered_col=interfered_col, low_stat_err_col=low_stat_err_col
+            )
+        except Exception as e:
+            print(f"  Error: {e}")
     
     return results
 
@@ -706,3 +727,111 @@ def run_continuous_interaction_analysis(
 def run_fuel_interaction_analysis(*args, **kwargs):
     """Deprecated: Use run_continuous_interaction_analysis instead."""
     return run_continuous_interaction_analysis(*args, **kwargs)
+
+
+def run_full_interaction_analysis(
+    panel: pd.DataFrame,
+    ets_col: str = LOG_ETS_CO2_COL,
+    reported_nox_col: str = "log_reported_nox",
+    satellite_nox_col: str = "beirle_nox_kg_s",
+    treatment_col: str = TREATMENT_COL,
+    base_controls: List[str] = [],
+    cluster_col: str = CLUSTER_COL,
+    id_col: str = FAC_ID_COL,
+    time_col: str = YEAR_COL,
+    urban_col: str = "in_urban_area"
+) -> Dict[str, pd.DataFrame]:
+    """
+    Run continuous interaction analysis for all TWFE specifications (triple outcomes).
+    
+    Triple Outcomes:
+    1. ETS CO₂ (ground-truth)
+    2. Reported NOx (ground-truth, LCP Directive)
+    3-6. Satellite NOx (proxy) with embedding reduction
+    
+    Returns dict mapping spec name -> results DataFrame.
+    """
+    from embedding_reduction import reduce_embeddings, get_reduced_embedding_cols
+    
+    if base_controls is []:
+        base_controls = ["capacity_mw", "share_coal", "share_gas"]
+    
+    results = {}
+    
+    # 1. ETS CO₂
+    print("Running interactions: ETS CO₂...")
+    results["ETS CO₂"] = run_continuous_interaction_analysis(
+        panel, outcome_col=ets_col, treatment_col=treatment_col,
+        controls=base_controls, cluster_col=cluster_col,
+        id_col=id_col, time_col=time_col, urban_col=urban_col
+    )
+    
+    # 2. Reported NOx (ground-truth from LCP Directive)
+    if reported_nox_col in panel.columns:
+        nox_sample = panel.dropna(subset=[reported_nox_col])
+        if len(nox_sample) >= 50:
+            print("Running interactions: Reported NOx (LCP)...")
+            results["Reported NOx (LCP)"] = run_continuous_interaction_analysis(
+                nox_sample, outcome_col=reported_nox_col, treatment_col=treatment_col,
+                controls=base_controls, cluster_col=cluster_col,
+                id_col=id_col, time_col=time_col, urban_col=urban_col
+            )
+        else:
+            print(f"  Skipping Reported NOx: insufficient data ({len(nox_sample)} obs)")
+    
+    # 3-6. Satellite NOx: (PCA/PLS) × (Permissive/Conservative)
+    if satellite_nox_col not in panel.columns:
+        return results
+    
+    for dl_col, dl_label in [("above_dl_permissive", "DL≥0.01"), ("above_dl_conservative", "DL≥0.04")]:
+        if dl_col not in panel.columns:
+            continue
+        sat_nox_sample = panel[panel[dl_col] == True].copy()
+        if len(sat_nox_sample) < 50:
+            print(f"  Skipping Satellite NOx {dl_label}: insufficient data")
+            continue
+        
+        for emb_method in ["pca", "pls"]:
+            spec_name = f"Satellite NOx ({emb_method.upper()}, {dl_label})"
+            print(f"Running interactions: {spec_name}...")
+            try:
+                df_reduced = reduce_embeddings(
+                    sat_nox_sample.copy(), method=emb_method, n_components=10, # type: ignore
+                    target_col=satellite_nox_col if emb_method == "pls" else None
+                )
+                emb_cols = get_reduced_embedding_cols(df_reduced, method=emb_method)
+                controls_with_emb = base_controls + emb_cols
+                
+                results[spec_name] = run_continuous_interaction_analysis(
+                    df_reduced, outcome_col=satellite_nox_col, treatment_col=treatment_col,
+                    controls=controls_with_emb, cluster_col=cluster_col,
+                    id_col=id_col, time_col=time_col, urban_col=urban_col
+                )
+            except Exception as e:
+                print(f"  Error: {e}")
+    
+    return results
+
+
+def display_interaction_results(results: Dict[str, pd.DataFrame]) -> None:
+    """Display continuous interaction results as formatted tables."""
+    print("\n" + "=" * 70)
+    print("CONTINUOUS INTERACTION RESULTS SUMMARY")
+    print("=" * 70)
+    
+    for spec_name, df in results.items():
+        if df is None or len(df) == 0:
+            continue
+        print(f"\n### {spec_name}")
+        df_display = df.copy()
+        df_display["Coef"] = df_display["Coef"].apply(lambda x: f"{x:.6f}" if pd.notna(x) else "N/A")
+        df_display["SE"] = df_display["SE"].apply(lambda x: f"{x:.6f}" if pd.notna(x) else "N/A")
+        df_display["P-value"] = df_display["P-value"].apply(lambda x: f"{x:.4f}" if pd.notna(x) else "N/A")
+        
+        # Use pandas display
+        from IPython.display import display
+        display(df_display)
+    
+    print("\n" + "-" * 70)
+    print("Note: Positive interaction = weaker (less negative) treatment effect for that characteristic")
+    print("      * p<0.1, ** p<0.05, *** p<0.01")

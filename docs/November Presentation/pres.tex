@@ -1,0 +1,568 @@
+\documentclass{beamer}
+\usetheme{Madrid}
+\usecolortheme{default}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{multicol}
+
+% Set graphics path
+\graphicspath{{../paper/figures/}}
+
+\title[EU ETS Effects on Emissions]{Quantifying the Effects of Climate Policy Stringency on Verified Emissions and Satellite-Derived NOx}
+\subtitle{Master's Thesis}
+\author{Arnav Agrawal}
+\institute{Columbia University \\ MA in Quantitative Methods in the Social Sciences}
+\date{December 2025}
+
+\begin{document}
+
+%% ========================================================================
+%% SLIDE 1: TITLE
+%% ========================================================================
+\begin{frame}
+\titlepage
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 2: RESEARCH QUESTION
+%% ========================================================================
+\begin{frame}{Research Question \& Motivation}
+
+\textbf{Core Question:} How does EU ETS policy stringency affect emissions at the facility level?
+
+\vspace{0.3cm}
+\textbf{Dual-Outcome Approach:}
+\begin{itemize}
+    \item \textbf{Verified CO$_2$}: Administrative data from EU ETS registry (gold standard)
+    \item \textbf{Satellite NOx}: Independent physical measurement from TROPOMI
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Why Both?}
+\begin{itemize}
+    \item CO$_2$: Accurate compliance trajectories, global climate impact
+    \item NOx: Local air quality co-benefits, health impacts (respiratory, cardiovascular)
+    \item Cross-validation: Agreement between independent systems strengthens causal claims
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Sample:} 521 large combustion plants across 82 NUTS2 regions (2018--2023)
+
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 3: EU ETS BACKGROUND
+%% ========================================================================
+\begin{frame}{EU ETS Background}
+
+\textbf{Cap-and-Trade System} (established 2005)
+\begin{itemize}
+    \item World's largest carbon market, covers $\sim$40\% of EU GHG emissions
+    \item Large combustion plants ($\geq$20 MW) must hold allowances = verified emissions
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Treatment Variable: Allocation Ratio}
+\[
+R_{it} = \frac{\text{Free Allocation}_{it}}{\text{Verified Emissions}_{it}}
+\]
+\begin{itemize}
+    \item $R < 1$: Shortfall $\rightarrow$ must purchase allowances (policy stringency)
+    \item $R > 1$: Surplus $\rightarrow$ can sell excess allowances
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Key Policy Evolution (Phase III/IV):}
+\begin{itemize}
+    \item Power sector lost most free allocation $\rightarrow$ full marginal carbon cost
+    \item Electricity: mean $R = 0.52$ vs. Other sectors: mean $R = 1.03$
+\end{itemize}
+
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 4: TREATMENT VARIATION
+%% ========================================================================
+\begin{frame}{Policy Stringency: Verified vs. Allocated Emissions}
+
+\begin{center}
+\includegraphics[width=0.85\textwidth]{verified_vs_allocated.png}
+\end{center}
+
+\vspace{-0.2cm}
+\begin{itemize}
+    \item \textbf{Teal}: Verified emissions; \textbf{Yellow dashed}: Free allocation
+    \item Gap above allocation line = shortfall requiring market purchases
+    \item Within-facility variation over time provides identification
+\end{itemize}
+
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 5: GEOGRAPHIC DISTRIBUTION
+%% ========================================================================
+\begin{frame}{Geographic Distribution of Sample}
+
+\begin{center}
+\includegraphics[width=0.50\textwidth]{NUTS_heatmap.png}
+\end{center}
+
+\vspace{-0.2cm}
+\begin{itemize}
+    \item 521 facilities across 82 NUTS2 regions
+    \item Concentration in Germany, Poland, Spain, France
+    \item NUTS2 regions used for clustering and Region$\times$Year FE
+\end{itemize}
+
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 6: DATA SOURCES
+%% ========================================================================
+\begin{frame}{Data Sources \& Sample Construction}
+
+\textbf{Three Linked Data Sources:}
+\begin{enumerate}
+    \item \textbf{EEA Large Combustion Plant Registry}: Coordinates, capacity, fuel mix
+    \item \textbf{EU ETS (EUTL)}: Verified emissions, free allocations
+    \item \textbf{TROPOMI Satellite}: Daily NO$_2$ tropospheric columns (3.5$\times$5.5 km)
+\end{enumerate}
+
+\vspace{0.3cm}
+\textbf{Sample Attrition:}
+\begin{itemize}
+    \item 3,405 plants $\rightarrow$ 932 facilities (500m spatial clustering)
+    \item $\rightarrow$ 521 facilities with ETS linkage \& $\geq$3 years data
+    \item $\rightarrow$ 291 facilities for satellite NOx ($\geq$20 valid days/year)
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Key Statistics:} Mean emissions 580 ktCO$_2$/yr, 80.8\% electricity sector
+
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 7: BEIRLE NOx METHODOLOGY
+%% ========================================================================
+\begin{frame}{Satellite NOx: Beirle Flux-Divergence Method}
+
+\begin{columns}
+\begin{column}{0.55\textwidth}
+\textbf{Physical Basis:} Continuity equation
+\[
+\underbrace{\mathbf{w} \cdot \nabla V}_{\text{Advection}} \approx E - S
+\]
+
+\textbf{Implementation:}
+\begin{enumerate}
+    \item Spatial gradient of NO$_2$ (TROPOMI)
+    \item $\times$ wind velocity (ERA5-Land)
+    \item Integrate over 15 km disc
+    \item Lifetime \& topographic corrections
+\end{enumerate}
+
+\vspace{0.2cm}
+\textbf{Key Thresholds:}
+\begin{itemize}
+    \item Detection: 0.11 kg/s (conservative)
+    \item Uncertainty: $\sim$35--45\%
+\end{itemize}
+\end{column}
+\begin{column}{0.45\textwidth}
+\includegraphics[width=\textwidth]{beirle_EDA.png}
+\end{column}
+\end{columns}
+
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 8: ALPHAEARTH EMBEDDINGS
+%% ========================================================================
+\begin{frame}{AlphaEarth Embeddings: High-Dimensional Controls}
+
+\textbf{Google AlphaEarth Foundations} (2025): 64-dim geospatial representations learned from:
+\begin{itemize}
+    \item Multi-source satellite imagery (Sentinel-1/2, Landsat)
+    \item Climate reanalysis (ERA5-Land), topography (GLO-30)
+    \item Geotagged text (Wikipedia, GBIF)
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{What Embeddings Encode:}
+\begin{itemize}
+    \item Land use context (urban density, industrial areas)
+    \item Infrastructure (roads, built environment)
+    \item Vegetation, climate patterns, terrain
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Why Use Them?}
+\begin{itemize}
+    \item Control satellite retrieval confounders (terrain $\rightarrow$ AMF; urban $\rightarrow$ background NO$_2$)
+    \item High-dimensional spatial confounders that would be impractical to specify manually
+    \item Extends Veitch et al. (2019) text embeddings to geospatial domain
+\end{itemize}
+
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 9: EMBEDDING DIMENSIONALITY REDUCTION
+%% ========================================================================
+\begin{frame}{Embedding Dimensionality Reduction: PCA vs. PLS}
+
+\textbf{Problem:} 64 dimensions may cause overfitting with limited within-facility variation
+
+\vspace{0.3cm}
+\textbf{PCA (Unsupervised):}
+\begin{itemize}
+    \item Projects onto directions maximizing variance in embedding space
+    \item \textbf{Causally safe}---does not use outcome information
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{PLS (Supervised):}
+\begin{itemize}
+    \item Projects onto directions that predict NOx outcome
+    \item \textbf{Risk:} Naive PLS on panel $\rightarrow$ regularization bias (outcome snooping)
+\item \textbf{Solution:} Train on \textit{facility-level means} (cross-sectional), not panel obs.
+Then reproject every fac-year's embedding using the trained projector.
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Key Design:} PLS trained on $\bar{Y}_i^{\text{NOx}} = T^{-1}\sum_t Y_{it}$ (one obs/facility)
+\begin{itemize}
+    \item Resulting embeddings are \textit{time-invariant} within facility
+    \item $\equiv$ pre-treatment covariates $\rightarrow$ no ``bad controls'' problem
+    \item Both methods: 64-dim $\rightarrow$ 10 components
+\end{itemize}
+
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 10: EMPIRICAL STRATEGY
+%% ========================================================================
+\begin{frame}{Empirical Strategy}
+
+\textbf{Two-Way Fixed Effects (TWFE):}
+\[
+Y_{it} = \alpha_i + \gamma_{r(i),t} + \beta R_{it} + \mathbf{X}_{it}'\boldsymbol{\delta} + \varepsilon_{it}
+\]
+
+\vspace{0.2cm}
+\begin{itemize}
+    \item $\alpha_i$: Facility FE (absorb time-invariant confounders)
+    \item $\gamma_{r(i),t}$: NUTS2 Region $\times$ Year FE (absorb regional trends)
+    \item $\mathbf{X}_{it}$: Capacity, fuel shares, AlphaEarth embeddings (NOx only)
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Identification:} Within-facility variation in allocation ratios over time
+
+\vspace{0.3cm}
+\textbf{Key Design Choices:}
+\begin{itemize}
+    \item Cluster SEs by NUTS2 region (82 clusters)
+    \item AlphaEarth embeddings (64-dim $\rightarrow$ 10-dim via PCA/PLS) control satellite confounders
+    \item Do \textit{not} control for dispatch---mediator, not confounder
+\end{itemize}
+
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 11: EMBEDDING CORRELATIONS
+%% ========================================================================
+\begin{frame}{AlphaEarth Embeddings: Component Correlations}
+
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\begin{center}
+\textbf{PCA (Unsupervised)}
+\includegraphics[width=\textwidth]{pca_component_correlations.png}
+\end{center}
+\end{column}
+\begin{column}{0.5\textwidth}
+\begin{center}
+\textbf{PLS (Supervised)}
+\includegraphics[width=\textwidth]{pls_component_correlations.png}
+\end{center}
+\end{column}
+\end{columns}
+
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 12: EMBEDDING MAPS
+%% ========================================================================
+\begin{frame}{AlphaEarth Embeddings: Geographic Distribution}
+
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\begin{center}
+\textbf{PCA Components 1--4}
+\includegraphics[width=\textwidth]{pca_component_maps.png}
+\end{center}
+\end{column}
+\begin{column}{0.5\textwidth}
+\begin{center}
+\textbf{PLS Components 1--4}
+\includegraphics[width=\textwidth]{pls_component_maps.png}
+\end{center}
+\end{column}
+\end{columns}
+
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 13: MAIN RESULTS - CO2
+%% ========================================================================
+\begin{frame}{Main Results: Verified CO$_2$ Emissions}
+
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\begin{table}[h]
+\centering
+\begin{tabular}{lc}
+\toprule
+& Log CO$_2$ \\
+\midrule
+Allocation Ratio & $-0.186$*** \\
+& (0.030) \\
+\midrule
+95\% CI & [$-0.25$, $-0.13$] \\
+Observations & 2,723 \\
+Facilities & 521 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{0.2cm}
+\textbf{Interpretation:}
+\begin{itemize}
+    \item 10\% shortfall $\rightarrow$ \textbf{1.9\%} lower emissions
+    \item At mean: $\sim$11 ktCO$_2$ reduction
+    \item $p < 0.001$
+\end{itemize}
+\end{column}
+\begin{column}{0.5\textwidth}
+\includegraphics[width=\textwidth]{emissions_allocations_sectors.png}
+\vspace{-0.3cm}
+\begin{center}
+\scriptsize Electricity (orange) vs. Other sectors (blue)
+\end{center}
+\end{column}
+\end{columns}
+
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 14: MAIN RESULTS - NOx
+%% ========================================================================
+\begin{frame}{Main Results: Satellite-Derived NOx}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lcccc}
+\toprule
+& \multicolumn{2}{c}{DL $\geq$ 0.03 kg/s} & \multicolumn{2}{c}{DL $\geq$ 0.11 kg/s} \\
+& PCA & PLS & PCA & PLS \\
+\midrule
+Allocation Ratio & $-0.000$ & $-0.000$ & $-0.003$** & $-0.003$*** \\
+& (0.000) & (0.000) & (0.001) & (0.000) \\
+\midrule
+$p$-value & 0.84 & 0.65 & 0.017 & 0.001 \\
+N & 577 & 577 & 140 & 140 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{0.2cm}
+\textbf{Key Pattern:}
+\begin{itemize}
+    \item \textbf{Null} at permissive threshold---noise dominates signal
+    \item \textbf{Significant} at conservative threshold (DL $\geq$ 0.11 kg/s)
+    \item 10\% shortfall $\rightarrow$ $\sim$\textbf{1.7\%} lower NOx (consistent with 1.9\% CO$_2$!)
+\end{itemize}
+
+\vspace{0.2cm}
+\textbf{Cross-Validation:} Directional agreement between administrative \& satellite outcomes
+
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 15: CO2 HETEROGENEITY
+%% ========================================================================
+\begin{frame}{Heterogeneity: ETS CO$_2$ by Fuel, Sector, Location}
+
+\begin{columns}
+\begin{column}{0.55\textwidth}
+\begin{table}[h]
+\centering
+\scriptsize
+\begin{tabular}{llcc}
+\toprule
+Dimension & Group & $\beta$ & N \\
+\midrule
+\textit{Fuel} & Coal & $-0.98$*** & 653 \\
+& Gas & $-0.21$*** & 1,197 \\
+& Oil & $-0.45$ & 129 \\
+& Biomass & $-0.11$*** & 438 \\
+\midrule
+\textit{Sector} & Electricity & $-0.21$*** & 2,173 \\
+& Other & $-0.09$*** & 443 \\
+\midrule
+\textit{Location} & Rural & $-0.24$*** & 650 \\
+& Urban & $-0.15$*** & 1,943 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{column}
+\begin{column}{0.45\textwidth}
+\includegraphics[width=\textwidth]{average_fuel_mix.png}
+\vspace{-0.3cm}
+\begin{center}
+\scriptsize Coal declining, gas/biomass rising
+\end{center}
+\end{column}
+\end{columns}
+
+\vspace{0.2cm}
+\textbf{Interpretation:} Coal ($\sim$95 tCO$_2$/TJ) faces highest carbon intensity $\rightarrow$ strongest response. Electricity lost free allocation $\rightarrow$ full marginal cost.
+
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 16: CO2 HETEROGENEITY - COUNTRY & PYPSA
+%% ========================================================================
+\begin{frame}{Heterogeneity: ETS CO$_2$ by Country \& PyPSA Cluster}
+
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\textbf{By Country:}
+\begin{table}[h]
+\centering
+\scriptsize
+\begin{tabular}{lcc}
+\toprule
+Country & $\beta$ & N \\
+\midrule
+Spain & $-1.25$*** & 125 \\
+Poland & $-0.33$*** & 743 \\
+France & $-0.25$*** & 920 \\
+Austria & $-0.24$*** & 227 \\
+Sweden & $-0.11$*** & 421 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{column}
+\begin{column}{0.5\textwidth}
+\textbf{By PyPSA-Eur Cluster:}
+\begin{table}[h]
+\centering
+\scriptsize
+\begin{tabular}{lcc}
+\toprule
+Cluster & $\beta$ & N \\
+\midrule
+PL0 2 (Poland) & $-1.46$*** & 228 \\
+PL0 0 (Poland) & $-1.09$*** & 122 \\
+PL0 1 (Poland) & $-0.38$* & 148 \\
+AT0 0 (Austria) & $-0.26$** & 129 \\
+FR0 9 (France) & $-0.25$** & 212 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{column}
+\end{columns}
+
+\vspace{0.2cm}
+\textbf{Interpretation:} Polish clusters show strongest effects (5--7$\times$ pooled estimate)---coal-heavy generation mix. PyPSA clusters group facilities facing correlated prices \& dispatch.
+
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 17: NOx HETEROGENEITY
+%% ========================================================================
+\begin{frame}{Heterogeneity: Satellite NOx (DL $\geq$ 0.11, PLS)}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{llccc}
+\toprule
+Dimension & Group & $\beta$ & $p$ & N \\
+\midrule
+\textit{Sector} & Electricity & $-0.003$*** & .002 & 132 \\
+\textit{Interference} & Yes ($<$20km) & $-0.003$** & .013 & 140 \\
+\textit{Stat Error} & Low ($<$30\%) & $-0.003$** & .013 & 140 \\
+\midrule
+\textit{Location} & Urban & $+0.007$** & .045 & 128 \\
+\textit{Fuel} & Gas & $-0.003$ & .90 & 68 \\
+& Coal & $+0.051$*** & .001 & 38 \\
+\textit{Country} & France & $-0.004$*** & .008 & 96 \\
+& Poland & $+0.079$** & .021 & 44 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{0.2cm}
+\textbf{Findings:} Electricity drives main effect; robustness to interference \& stat error. \\
+\textbf{Anomalies:} Urban/Coal/Poland show positive $\beta$---likely measurement noise (small N=140).
+
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 18: ROBUSTNESS
+%% ========================================================================
+\begin{frame}{Robustness Summary}
+
+\textbf{Cross-Outcome Consistency:}
+\begin{itemize}
+    \item Both CO$_2$ and NOx show negative effects (1.9\% vs. 1.7\%)
+    \item Agreement across independent measurement systems
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Embedding Method Stability:}
+\begin{itemize}
+    \item PCA vs. PLS nearly identical at DL $\geq$ 0.11 ($-0.00282$ vs. $-0.00301$)
+    \item Not sensitive to dimensionality reduction approach
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Measurement Quality:}
+\begin{itemize}
+    \item \textbf{Spatial interference}: Effects persist for interfered facilities ($\beta = -0.003$**, $p = 0.013$)
+    \item \textbf{Detection limit}: Null $\rightarrow$ significant pattern consistent with physics
+    \item Inverse-variance weighting accounts for heteroskedasticity
+\end{itemize}
+
+\end{frame}
+
+%% ========================================================================
+%% SLIDE 19: CONTRIBUTIONS & CONCLUSION
+%% ========================================================================
+\begin{frame}{Contributions \& Conclusion}
+
+\textbf{Three Methodological Contributions:}
+\begin{enumerate}
+    \item \textbf{AlphaEarth Embeddings}: Geospatial foundation model as high-dim controls (extends Veitch et al. 2019 to geospatial domain)
+    \item \textbf{NUTS2 + PyPSA-Eur}: Administrative regions for inference, network clusters for electricity heterogeneity
+    \item \textbf{Beirle Flux-Divergence}: Atmospheric physics adapted for panel econometrics
+\end{enumerate}
+
+\vspace{0.3cm}
+\textbf{Key Empirical Findings:}
+\begin{itemize}
+    \item 10\% allocation shortfall $\rightarrow$ \textbf{1.9\% lower CO$_2$} ($p < 0.001$)
+    \item Satellite NOx corroborates at conservative DL ($\sim$1.7\%)
+    \item Effects strongest for \textbf{coal-dominant} and \textbf{electricity-sector} facilities
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Broader Impact:} Framework for dual-outcome policy evaluation combining administrative records with satellite remote sensing
+
+\end{frame}
+
+\end{document}

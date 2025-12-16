@@ -23,6 +23,7 @@ from typing import Optional, Tuple, List, Union, overload
 from sklearn.decomposition import PCA
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
 
 # Default column names
 _DEFAULT_FAC_ID_COL = "idx"
@@ -132,7 +133,7 @@ def reduce_embeddings_pls(
     """
     Apply facility-level PLS to project embeddings onto outcome-relevant directions.
     
-    CRITICAL: PLS is trained on FACILITY-LEVEL MEANS (one row per facility), not
+    PLS is trained on FACILITY-LEVEL MEANS (one row per facility), not
     panel observations. This prevents outcome snooping:
     - Panel PLS would learn from yearly shocks → biased treatment effects
     - Facility-level PLS learns only static geographic context → safe
@@ -402,3 +403,285 @@ def compare_reduction_methods(
             print(f"PLS {n_comp} failed: {e}")
     
     return pd.DataFrame(results)
+
+
+# =============================================================================
+# Visualization & Interpretation
+# =============================================================================
+
+def plot_component_map(
+    df: pd.DataFrame,
+    component_idx: int = 0,
+    method: str = "pca",
+    prefix: Optional[str] = None,
+    lat_col: str = "lat",
+    lon_col: str = "lon",
+    id_col: str = _DEFAULT_FAC_ID_COL,
+    figsize: Tuple[int, int] = (14, 10),
+    cmap: str = "RdBu_r"
+) -> plt.Figure: # type: ignore
+    """
+    Map facilities colored by a PCA/PLS component value.
+    
+    Helps interpret what geographic patterns each component captures
+    (e.g., North/South gradient, coastal vs inland, urban clusters).
+    
+    Parameters
+    ----------
+    df : DataFrame
+        Panel with lat, lon, and reduced embedding columns
+    component_idx : int
+        Which component to visualize (0 = first component)
+    method : str
+        'pca' or 'pls'
+    prefix : str, optional
+        Custom column prefix
+    lat_col, lon_col : str
+        Coordinate columns
+    id_col : str
+        Facility ID column
+    figsize : tuple
+        Figure size
+    cmap : str
+        Colormap name
+    
+    Returns
+    -------
+    matplotlib Figure
+    """
+    import matplotlib.pyplot as plt
+    
+    if prefix is None:
+        prefix = f"{method}_emb_"
+    
+    comp_col = f"{prefix}{component_idx:02d}"
+    if comp_col not in df.columns:
+        raise ValueError(f"Component column {comp_col} not found")
+    
+    # Collapse to facility level
+    fac_df = df.groupby(id_col).agg({
+        lat_col: "first",
+        lon_col: "first", 
+        comp_col: "mean"
+    }).dropna()
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    scatter = ax.scatter(
+        fac_df[lon_col], fac_df[lat_col],
+        c=fac_df[comp_col], cmap=cmap,
+        s=50, alpha=0.7, edgecolors="k", linewidths=0.3
+    )
+    
+    cbar = plt.colorbar(scatter, ax=ax, shrink=0.7)
+    cbar.set_label(f"{method.upper()} Component {component_idx + 1}")
+    
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    ax.set_title(f"Facility Locations by {method.upper()} Component {component_idx + 1}")
+    
+    plt.tight_layout()
+    return fig
+
+
+def plot_component_correlations(
+    df: pd.DataFrame,
+    feature_cols: List[str],
+    n_components: int = 10,
+    method: str = "pca",
+    prefix: Optional[str] = None,
+    id_col: str = _DEFAULT_FAC_ID_COL,
+    figsize: Tuple[int, int] = (12, 8)
+) -> plt.Figure: # type: ignore
+    """
+    Correlate PCA/PLS components with interpretable facility features.
+    
+    Creates a heatmap showing correlations between embedding components
+    and features like urban/rural, electricity sector, country dummies.
+    
+    Parameters
+    ----------
+    df : DataFrame
+        Panel with reduced embedding columns and feature columns
+    feature_cols : list
+        Columns to correlate (e.g., ['in_urban_area', 'is_electricity'])
+    n_components : int
+        Number of components to include
+    method : str
+        'pca' or 'pls'
+    prefix : str, optional
+        Custom column prefix
+    id_col : str
+        Facility ID column
+    figsize : tuple
+        Figure size
+    
+    Returns
+    -------
+    matplotlib Figure
+    """
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    
+    if prefix is None:
+        prefix = f"{method}_emb_"
+    
+    comp_cols = [f"{prefix}{i:02d}" for i in range(n_components)]
+    comp_cols = [c for c in comp_cols if c in df.columns]
+    feature_cols = [c for c in feature_cols if c in df.columns]
+    
+    if not comp_cols or not feature_cols:
+        raise ValueError("No valid component or feature columns found")
+    
+    # Collapse to facility level
+    fac_df = df.groupby(id_col)[comp_cols + feature_cols].mean()
+    
+    # Compute correlations
+    corr_matrix = []
+    for feat in feature_cols:
+        row = []
+        for comp in comp_cols:
+            valid = fac_df[[feat, comp]].dropna() # type: ignore
+            if len(valid) > 2:
+                corr = valid[feat].corr(valid[comp]) # type: ignore
+            else:
+                corr = np.nan
+            row.append(corr)
+        corr_matrix.append(row)
+    
+    corr_df = pd.DataFrame(
+        corr_matrix, 
+        index=feature_cols, # type: ignore
+        columns=[f"PC{i+1}" for i in range(len(comp_cols))] # type: ignore
+    )
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.heatmap(corr_df, annot=True, fmt=".2f", cmap="RdBu_r", center=0,
+                vmin=-1, vmax=1, ax=ax, cbar_kws={"shrink": 0.8})
+    ax.set_title(f"{method.upper()} Components vs Interpretable Features")
+    ax.set_xlabel("Component")
+    ax.set_ylabel("Feature")
+    plt.tight_layout()
+    return fig
+
+
+def plot_component_grid(
+    df: pd.DataFrame,
+    n_components: int = 4,
+    method: str = "pca",
+    prefix: Optional[str] = None,
+    lat_col: str = "lat",
+    lon_col: str = "lon",
+    id_col: str = _DEFAULT_FAC_ID_COL,
+    figsize: Tuple[int, int] = (16, 12),
+    cmap: str = "RdBu_r",
+    europe_only: bool = True,
+    add_basemap: bool = True
+) -> plt.Figure: # type: ignore
+    """
+    Create a grid of maps showing multiple PCA/PLS components.
+    
+    Useful for comparing spatial patterns across components.
+    
+    Parameters
+    ----------
+    df : DataFrame
+        Panel with lat, lon, and reduced embedding columns
+    n_components : int
+        Number of components to show
+    method : str
+        'pca' or 'pls'
+    prefix : str, optional
+        Custom column prefix
+    lat_col, lon_col : str
+        Coordinate columns
+    id_col : str
+        Facility ID column
+    figsize : tuple
+        Figure size
+    cmap : str
+        Colormap name
+    europe_only : bool
+        If True, zoom to Europe (lat > 30, lon > -30)
+    add_basemap : bool
+        If True, attempt to add country borders
+    
+    Returns
+    -------
+    matplotlib Figure
+    """
+    import matplotlib.pyplot as plt
+    
+    if prefix is None:
+        prefix = f"{method}_emb_"
+    
+    # Collapse to facility level
+    comp_cols = [f"{prefix}{i:02d}" for i in range(n_components)]
+    comp_cols = [c for c in comp_cols if c in df.columns]
+    n_show = len(comp_cols)
+    
+    if n_show == 0:
+        raise ValueError(f"No component columns found with prefix {prefix}")
+    
+    fac_df = df.groupby(id_col).agg({
+        lat_col: "first",
+        lon_col: "first",
+        **{c: "mean" for c in comp_cols}
+    }).dropna()
+    
+    # Filter to Europe if requested
+    if europe_only:
+        fac_df = fac_df[(fac_df[lat_col] > 30) & (fac_df[lon_col] > -30)]
+    
+    ncols = 2
+    nrows = (n_show + 1) // 2
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
+    axes = axes.flatten() if n_show > 1 else [axes]
+    
+    # Try to load Europe boundaries for basemap
+    europe_borders = None
+    if add_basemap:
+        try:
+            import geopandas as gpd
+            # Use naturalearth_lowres from geopandas-datasets or download directly
+            try:
+                from geodatasets import get_path # type: ignore
+                world = gpd.read_file(get_path('naturalearth.land'))
+            except ImportError:
+                # Fallback to direct URL
+                url = "https://naciscdn.org/naturalearth/110m/cultural/ne_110m_admin_0_countries.zip"
+                world = gpd.read_file(url)
+            europe_borders = world[world.geometry.centroid.y > 30]  # type: ignore
+        except Exception:
+            pass  # Silently fail if geopandas not available
+    
+    for i, comp_col in enumerate(comp_cols):
+        ax = axes[i]
+        
+        # Add basemap if available
+        if europe_borders is not None:
+            europe_borders.plot(ax=ax, color='lightgray', edgecolor='white', linewidth=0.5)
+        
+        scatter = ax.scatter(
+            fac_df[lon_col], fac_df[lat_col],
+            c=fac_df[comp_col], cmap=cmap,
+            s=40, alpha=0.8, edgecolors="k", linewidths=0.3,
+            zorder=5  # Ensure points are on top
+        )
+        plt.colorbar(scatter, ax=ax, shrink=0.7)
+        ax.set_title(f"{method.upper()} Component {i+1}")
+        ax.set_xlabel("Longitude")
+        ax.set_ylabel("Latitude")
+        
+        # Set Europe bounds
+        if europe_only:
+            ax.set_xlim(-12, 35)
+            ax.set_ylim(34, 62)
+    
+    # Hide unused axes
+    for j in range(n_show, len(axes)):
+        axes[j].set_visible(False)
+    
+    plt.suptitle(f"Geographic Distribution of {method.upper()} Components", fontsize=14)
+    plt.tight_layout()
+    return fig

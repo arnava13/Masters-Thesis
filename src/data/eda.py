@@ -4,6 +4,7 @@ EDA (Exploratory Data Analysis) functions for facilities and ETS data.
 Contains:
 - fac_eda: EDA for facilities static and yearly panels
 - ets_eda: EDA for ETS stringency/allocation data
+- beirle_eda: EDA for satellite NOx emission proxy
 """
 
 import pandas as pd
@@ -548,7 +549,7 @@ def beirle_eda(
     if 'beirle_nox_kg_s' in df.columns:
         data = df['beirle_nox_kg_s'].dropna()
         ax.hist(data, bins=50, color='steelblue', edgecolor='black', alpha=0.7)
-        ax.axvline(0.11, color='red', linestyle='--', linewidth=2, label='DL = 0.11 kg/s')
+        ax.axvline(0.01, color='red', linestyle='--', linewidth=2, label='DL = 0.01 kg/s')
         ax.axvline(data.mean(), color='green', linestyle='-', linewidth=2, 
                    label=f'Mean = {data.mean():.3f}')
         ax.set_xlabel('NOx Emission (kg/s)')
@@ -602,13 +603,12 @@ def beirle_eda(
     print("3. Detection Limit Analysis")
     print("-"*40)
     
-    above_dl = df['above_dl_0_11'].sum()
-    pct_above = 100 * above_dl / len(df)
-    print(f"Above generic DL (0.11 kg/s): {above_dl:,} ({pct_above:.1f}%)")
-    
-    above_dl = df['above_dl_0_03'].sum()
-    pct_above = 100 * above_dl / len(df)
-    print(f"Above ideal DL (0.03 kg/s): {above_dl:,} ({pct_above:.1f}%)")
+    if 'above_dl' in df.columns:
+        above_dl = df['above_dl'].sum()
+        pct_above = 100 * above_dl / len(df)
+        print(f"Above DL (0.01 kg/s): {above_dl:,} ({pct_above:.1f}%)")
+    else:
+        print("No above_dl column found")
     
     # -------------------------------------------------------------------------
     # 4. By Country
@@ -633,62 +633,119 @@ def beirle_eda(
     plt.show()
     
     # -------------------------------------------------------------------------
-    # 5. ETS CO₂ vs NOx Correlation
+    # 5. Reported NOx vs Satellite NOx Correlation (by Sample Split)
     # -------------------------------------------------------------------------
     print("\n" + "-"*40)
-    print("5. ETS Verified CO₂ vs NOx Correlation")
+    print("5. Reported NOx vs Satellite NOx Correlation (by Sample Split)")
     print("-"*40)
     
-    # Merge ETS data if yearly panel provided
-    if facilities_yearly is not None and 'eu_verified_tco2' in facilities_yearly.columns:
+    # Merge reported NOx and static attributes for splits
+    if facilities_yearly is not None and 'reported_nox_tonnes' in facilities_yearly.columns:
         df_merged = df.merge(
-            facilities_yearly[[fac_id_col, 'year', 'eu_verified_tco2']],
+            facilities_yearly[[fac_id_col, 'year', 'reported_nox_tonnes']],
             on=[fac_id_col, 'year'],
             how='left'
         )
-    elif 'eu_verified_tco2' in df.columns:
+    elif 'reported_nox_tonnes' in df.columns:
         df_merged = df
     else:
-        print("ETS data not available. Pass facilities_yearly with eu_verified_tco2 column.")
+        print("Reported NOx data not available. Pass facilities_yearly with reported_nox_tonnes column.")
         return
     
-    # Filter to valid observations
-    plot_df = df_merged[['beirle_nox_kg_s', 'eu_verified_tco2']].dropna()
+    # Merge static attributes for urban/interference splits
+    if static_panel is not None:
+        static_cols = [fac_id_col]
+        if 'in_urban_area' in static_panel.columns:
+            static_cols.append('in_urban_area')
+        if 'interfered_5km' in static_panel.columns:
+            static_cols.append('interfered_5km')
+        df_merged = df_merged.merge(static_panel[static_cols], on=fac_id_col, how='left')
     
-    if len(plot_df) < 10:
-        print(f"Insufficient data for correlation (n={len(plot_df)})")
-        return
+    # Filter to above detection limit
+    if 'above_dl' in df_merged.columns:
+        df_merged = df_merged[df_merged['above_dl'] == True].copy()
     
-    # Compute correlation
-    corr = plot_df['beirle_nox_kg_s'].corr(plot_df['eu_verified_tco2']) # type: ignore
-    log_corr = np.log10(plot_df['beirle_nox_kg_s'].clip(lower=1e-6)).corr( # type: ignore
-        np.log10(plot_df['eu_verified_tco2'].clip(lower=1)) # type: ignore
-    )
-    print(f"Pearson correlation (levels): {corr:.3f}")
-    print(f"Pearson correlation (log-log): {log_corr:.3f}")
-    print(f"N observations: {len(plot_df):,}")
+    # Define sample splits: 1) All, 2) Non-urban, 3) Non-urban + not interfered
+    sample_configs = [
+        {'name': 'All Points', 'filter': lambda x: x},
+        {'name': 'Non-Urban', 'filter': lambda x: x[x.get('in_urban_area', True) == False] if 'in_urban_area' in x.columns else x},
+        {'name': 'Non-Urban + Not Interfered', 'filter': lambda x: x[(x.get('in_urban_area', True) == False) & (x.get('interfered_5km', True) == False)] if 'in_urban_area' in x.columns and 'interfered_5km' in x.columns else x},
+    ]
     
-    # Scatterplot
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    # Colors for the three samples
+    sample_colors = ['#3498db', '#27ae60', '#e74c3c']  # blue, green, red
     
-    # Levels
-    ax = axes[0]
-    ax.scatter(plot_df['eu_verified_tco2'] / 1e6, plot_df['beirle_nox_kg_s'],
-               alpha=0.4, s=20, color='steelblue', edgecolor='none')
-    ax.set_xlabel('Verified ETS CO₂ (MtCO₂/yr)')
-    ax.set_ylabel('Satellite NOx (kg/s)')
-    ax.set_title(f'ETS CO₂ vs NOx Emissions (r = {corr:.3f})')
-    ax.grid(alpha=0.3)
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
     
-    # Log-log
-    ax = axes[1]
-    ax.scatter(np.log10(plot_df['eu_verified_tco2'].clip(lower=1)), # type: ignore
-               np.log10(plot_df['beirle_nox_kg_s'].clip(lower=1e-6)), # type: ignore
-               alpha=0.4, s=20, color='steelblue', edgecolor='none')
-    ax.set_xlabel('log₁₀(Verified ETS CO₂)')
-    ax.set_ylabel('log₁₀(Satellite NOx)')
-    ax.set_title(f'Log-Log Scale (r = {log_corr:.3f})')
-    ax.grid(alpha=0.3)
+    for i, (cfg, ax, color) in enumerate(zip(sample_configs, axes, sample_colors)):
+        sample_name = cfg['name']
+        try:
+            sample_df = cfg['filter'](df_merged)
+        except Exception:
+            sample_df = df_merged
+        
+        plot_df = sample_df[['beirle_nox_kg_s', 'reported_nox_tonnes']].dropna() # type: ignore
+        
+        if len(plot_df) < 10:
+            print(f"  {sample_name}: Insufficient data (n={len(plot_df)})")
+            ax.set_title(f'{sample_name}\n(n={len(plot_df)}, insufficient)')
+            ax.set_xlabel('Reported NOx (tonnes/yr)')
+            ax.set_ylabel('Satellite NOx (kg/s)')
+            continue
+        
+        # Compute correlations
+        corr = plot_df['beirle_nox_kg_s'].corr(plot_df['reported_nox_tonnes'])  # type: ignore
+        log_corr = np.log10(plot_df['beirle_nox_kg_s'].clip(lower=1e-6)).corr(  # type: ignore
+            np.log10(plot_df['reported_nox_tonnes'].clip(lower=1))  # type: ignore
+        )
+        
+        print(f"  {sample_name}: r={corr:.3f} (levels), r={log_corr:.3f} (log-log), n={len(plot_df):,}")
+        
+        # Scatterplot
+        ax.scatter(plot_df['reported_nox_tonnes'], plot_df['beirle_nox_kg_s'],
+                   alpha=0.6, s=25, color=color, edgecolor='none')
+        ax.set_xlabel('Reported NOx (tonnes/yr)')
+        ax.set_ylabel('Satellite NOx (kg/s)')
+        ax.set_title(f'{sample_name}\nr={corr:.3f} (n={len(plot_df):,})')
+        ax.grid(alpha=0.3)
     
+    plt.suptitle('Reported vs Satellite NOx — Sample Splits (DL ≥ 0.01 kg/s)', 
+                 fontsize=12, fontweight='bold')
+    plt.tight_layout()
+    plt.show()
+    
+    # Log-log version
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    
+    for i, (cfg, ax, color) in enumerate(zip(sample_configs, axes, sample_colors)):
+        sample_name = cfg['name']
+        try:
+            sample_df = cfg['filter'](df_merged)
+        except Exception:
+            sample_df = df_merged
+        
+        plot_df = sample_df[['beirle_nox_kg_s', 'reported_nox_tonnes']].dropna() # type: ignore
+        
+        if len(plot_df) < 10:
+            ax.set_title(f'{sample_name}\n(insufficient data)')
+            ax.set_xlabel('log₁₀(Reported NOx)')
+            ax.set_ylabel('log₁₀(Satellite NOx)')
+            continue
+        
+        log_corr = np.log10(plot_df['beirle_nox_kg_s'].clip(lower=1e-6)).corr(  # type: ignore
+            np.log10(plot_df['reported_nox_tonnes'].clip(lower=1))  # type: ignore
+        )
+        
+        # Scatterplot (log-log)
+        ax.scatter(np.log10(plot_df['reported_nox_tonnes'].clip(lower=1)),  # type: ignore
+                   np.log10(plot_df['beirle_nox_kg_s'].clip(lower=1e-6)),  # type: ignore
+                   alpha=0.6, s=25, color=color, edgecolor='none')
+        ax.set_xlabel('log₁₀(Reported NOx)')
+        ax.set_ylabel('log₁₀(Satellite NOx)')
+        ax.set_title(f'{sample_name}\nr={log_corr:.3f} (n={len(plot_df):,})')
+        ax.grid(alpha=0.3)
+    
+    plt.suptitle('Reported vs Satellite NOx — Log-Log Scale (DL ≥ 0.01 kg/s)', 
+                 fontsize=12, fontweight='bold')
     plt.tight_layout()
     plt.show()
